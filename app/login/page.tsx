@@ -28,10 +28,11 @@ function LoginForm() {
     setMessage('')
 
     const supabase = createClient()
-    // Use NEXT_PUBLIC_APP_URL if set (for production), otherwise use current origin
-    const redirectUrl = process.env.NEXT_PUBLIC_APP_URL 
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
-      : `${window.location.origin}/auth/callback`
+    // Always use current origin for client-side (more reliable than env var)
+    // This ensures the redirect URL matches where the user is actually accessing the app
+    const redirectUrl = `${window.location.origin}/auth/callback`
+    
+    console.log('Magic link redirect URL:', redirectUrl)
     
     const { error } = await supabase.auth.signInWithOtp({
       email,
