@@ -148,7 +148,7 @@ export default function VotingRoundClient({
 
         {allVoted && (
           <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-sm">
-            You've voted on all movies. Waiting for other members...
+            You&apos;ve voted on all movies. Waiting for other members...
           </div>
         )}
 

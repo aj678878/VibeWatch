@@ -36,18 +36,24 @@ vercel
 
 ### 3. Configure Environment Variables in Vercel
 
-In your Vercel project dashboard, go to **Settings → Environment Variables** and add:
+**Important**: Vercel does NOT allow uploading `.env.local` files. You must manually enter each variable.
 
-```
-DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
-SUPABASE_URL=https://[PROJECT-REF].supabase.co
-SUPABASE_ANON_KEY=[your-anon-key]
-NEXT_PUBLIC_SUPABASE_URL=https://[PROJECT-REF].supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=[your-anon-key]
-TMDB_API_KEY=[your-tmdb-key]
-GROQ_API_KEY=[your-groq-key]
-NEXT_PUBLIC_APP_URL=https://[your-app].vercel.app
-```
+1. Go to your Vercel project dashboard
+2. Navigate to **Settings → Environment Variables**
+3. Click **"Add New"** for each variable
+4. Copy the **variable names and values** from your `.env.local` file
+
+**See [VERCEL_ENV_VARS.md](./VERCEL_ENV_VARS.md) for detailed instructions and checklist.**
+
+Required variables to add:
+- `DATABASE_URL` (from your `.env.local`)
+- `SUPABASE_URL` (from your `.env.local`)
+- `SUPABASE_ANON_KEY` (from your `.env.local`)
+- `NEXT_PUBLIC_SUPABASE_URL` (from your `.env.local`)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (from your `.env.local`)
+- `TMDB_API_KEY` (from your `.env.local`)
+- `GROQ_API_KEY` (from your `.env.local`)
+- `NEXT_PUBLIC_APP_URL` (set to your Vercel URL after first deployment)
 
 **Important**: Replace `[your-app]` with your actual Vercel deployment URL after first deployment.
 

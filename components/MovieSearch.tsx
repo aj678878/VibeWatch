@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { getPosterUrl } from '@/lib/tmdb'
 
 interface Movie {
@@ -101,10 +102,13 @@ export default function MovieSearch({ onSelectMovie, groupId }: MovieSearchProps
               className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
             >
               {movie.poster_path && (
-                <img
+                <Image
                   src={getPosterUrl(movie.poster_path, 'w200') || ''}
                   alt={movie.title}
+                  width={200}
+                  height={300}
                   className="w-16 h-24 object-cover rounded"
+                  unoptimized
                 />
               )}
               <div className="flex-1 min-w-0">

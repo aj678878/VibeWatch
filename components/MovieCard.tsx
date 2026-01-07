@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { getPosterUrl, getMovieDetails, type TMDBMovie } from '@/lib/tmdb'
 
 interface MovieCardProps {
@@ -75,10 +76,13 @@ export default function MovieCard({
   return (
     <div className="backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-colors">
       {movie.poster_path && (
-        <img
+        <Image
           src={getPosterUrl(movie.poster_path, 'w500') || ''}
           alt={movie.title}
+          width={500}
+          height={750}
           className="w-full h-80 object-cover rounded-lg mb-4"
+          unoptimized
         />
       )}
       <h3 className="font-light text-xl mb-2">{movie.title}</h3>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { getMovieDetails, getPosterUrl, type TMDBMovie } from '@/lib/tmdb'
 
 interface ResultsClientProps {
@@ -72,18 +73,21 @@ export default function ResultsClient({
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-5xl font-light mb-4">Tonight's pick is ready</h1>
+          <h1 className="text-5xl font-light mb-4">Tonight&apos;s pick is ready</h1>
           <p className="text-gray-400 text-lg">
-            Based on your group's preferences and voting
+            Based on your group&apos;s preferences and voting
           </p>
         </div>
 
         <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-8 mb-8">
           {movie.poster_path && (
-            <img
+            <Image
               src={getPosterUrl(movie.poster_path, 'w500') || ''}
               alt={movie.title}
+              width={500}
+              height={750}
               className="w-full max-w-md mx-auto rounded-lg mb-6"
+              unoptimized
             />
           )}
           <h2 className="text-3xl font-light text-center mb-4">{movie.title}</h2>

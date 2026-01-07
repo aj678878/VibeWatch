@@ -73,7 +73,7 @@ export default function NewSessionPage() {
                 placeholder="e.g., funny, light, under 2 hours, English"
               />
               <p className="text-xs text-gray-500 mt-2">
-                Describe what kind of movie you're in the mood for
+                Describe what kind of movie you&apos;re in the mood for
               </p>
             </div>
 
