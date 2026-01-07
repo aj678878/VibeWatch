@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Note: No users table - Supabase Auth handles user management
+// User IDs are stored as UUID strings from Supabase Auth
+
+model Group {
+  id                String   @id @default(uuid())
+  invite_code       String   @unique
+  created_by_user_id String  // Supabase Auth UUID
+  created_at        DateTime @default(now())
+
+  members           GroupMember[]
+  watchlists        GroupWatchlist[]
+  sessions          DecisionSession[]
+
+  @@index([invite_code])
+  @@index([created_by_user_id])
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  user_id   String   // Supabase Auth UUID
+  group_id  String
+  joined_at DateTime @default(now())
+
+  group Group @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, group_id])
+  @@index([user_id])
+  @@index([group_id])
+}
+
+model GroupWatchlist {
+  id       String @id @default(uuid())
+  group_id String
+  tmdb_id  Int    // Only store TMDB ID, fetch details on-demand
+
+  group Group @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([group_id, tmdb_id])
+  @@index([group_id])
+  @@index([tmdb_id])
+}
+
+model DecisionSession {
+  id                 String   @id @default(uuid())
+  group_id           String
+  vibe_text          String
+  status             String   @default("active") // active, completed
+  current_round      Int      @default(1)
+  final_movie_tmdb_id Int?    // Set when consensus or AI resolution
+  created_at         DateTime @default(now())
+
+  group  Group         @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  rounds VotingRound[]
+
+  @@index([group_id])
+  @@index([status])
+}
+
+model VotingRound {
+  id             String   @id @default(uuid())
+  session_id     String
+  round_number   Int
+  movie_tmdb_ids Json     // Array of TMDB IDs [123, 456, ...]
+
+  session DecisionSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  votes   Vote[]
+
+  @@unique([session_id, round_number])
+  @@index([session_id])
+}
+
+model Vote {
+  id            String   @id @default(uuid())
+  round_id      String
+  user_id       String   // Supabase Auth UUID
+  movie_tmdb_id Int
+  vote          String   // "yes" or "no"
+  reason_text   String?  // Optional rejection reason
+
+  round VotingRound @relation(fields: [round_id], references: [id], onDelete: Cascade)
+
+  @@unique([round_id, user_id, movie_tmdb_id])
+  @@index([round_id])
+  @@index([user_id])
+}
