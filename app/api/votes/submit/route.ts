@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
             status: 'completed',
             final_movie_tmdb_id: recommendation.topPick.tmdb_id,
             picked_by: 'ai',
-            alternates_json: recommendation.alternates,
+            alternates_json: recommendation.alternates as any, // Prisma JSON field requires type cast
           },
         })
 
