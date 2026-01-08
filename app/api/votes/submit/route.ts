@@ -129,6 +129,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, roundComplete: false })
     }
 
+    // Re-fetch session to check if it was completed by another concurrent request (idempotency)
+    const currentSession = await prisma.decisionSession.findUnique({
+      where: { id: round.session_id },
+      select: { status: true, final_movie_tmdb_id: true },
+    })
+
+    if (currentSession?.status === 'completed') {
+      return NextResponse.json({
+        success: true,
+        roundComplete: true,
+        sessionCompleted: true,
+        finalMovieTmdbId: currentSession.final_movie_tmdb_id,
+      })
+    }
+
     // SOLO MODE: If only 1 participant, use Groq to recommend a NEW movie
     const totalParticipants = activeParticipants.length
     if (totalParticipants === 1) {
