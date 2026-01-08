@@ -46,11 +46,8 @@ export default async function WatchlistPage({
     orderBy: { created_at: 'desc' },
     include: {
       rounds: {
-        where: {
-          round_number: {
-            // Get current round
-          },
-        },
+        orderBy: { round_number: 'desc' },
+        take: 1, // Get only the current round
         include: {
           votes: true,
         },
@@ -59,9 +56,14 @@ export default async function WatchlistPage({
   })
 
   // Get participant completion status for active session
-  let participantsWithStatus = group.participants.map((p) => ({
+  let participantsWithStatus: Array<{
+    id: string
+    type: 'member' | 'guest'
+    displayName: string
+    hasCompleted: boolean
+  }> = group.participants.map((p) => ({
     id: p.id,
-    type: p.type,
+    type: p.type as 'member' | 'guest', // Type assertion for literal union
     displayName: p.preferred_name || (p.type === 'member' ? 'Member' : 'Guest'),
     hasCompleted: false, // Will be calculated if session exists
   }))
@@ -79,7 +81,7 @@ export default async function WatchlistPage({
 
       return {
         id: p.id,
-        type: p.type,
+        type: p.type as 'member' | 'guest', // Type assertion for literal union
         displayName: p.preferred_name || (p.type === 'member' ? 'Member' : 'Guest'),
         hasCompleted,
       }
