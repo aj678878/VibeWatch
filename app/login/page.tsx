@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 function LoginForm() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
+  const [demoLoading, setDemoLoading] = useState(false)
   const [message, setMessage] = useState('')
   const searchParams = useSearchParams()
 
@@ -28,11 +29,7 @@ function LoginForm() {
     setMessage('')
 
     const supabase = createClient()
-    // Always use current origin for client-side (more reliable than env var)
-    // This ensures the redirect URL matches where the user is actually accessing the app
     const redirectUrl = `${window.location.origin}/auth/callback`
-    
-    console.log('Magic link redirect URL:', redirectUrl)
     
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -44,61 +41,95 @@ function LoginForm() {
     if (error) {
       setMessage(error.message)
     } else {
-      setMessage('Check your email for the magic link!')
+      setMessage('Check your email for the sign in link')
     }
     setLoading(false)
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900">
-      <div className="w-full max-w-md p-8">
-        <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-8 shadow-2xl">
-          <h1 className="text-3xl font-light mb-2 text-center">VibeWatch</h1>
-          <p className="text-sm text-gray-400 text-center mb-8">
-            Collaborative movie decision-making
-          </p>
+  const handleDemoLogin = async () => {
+    setDemoLoading(true)
+    setMessage('')
+    try {
+      const res = await fetch('/api/auth/demo', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        window.location.href = '/groups'
+      } else {
+        setMessage(data.error || 'Demo login failed')
+      }
+    } catch (error) {
+      setMessage('Demo login failed. Please try again.')
+    }
+    setDemoLoading(false)
+  }
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+  return (
+    <div className="min-h-screen bg-netflix-dark flex flex-col">
+      {/* Header */}
+      <header className="px-8 py-6">
+        <h1 className="text-netflix-red text-4xl font-bold tracking-tight">VIBEWATCH</h1>
+      </header>
+
+      {/* Main content */}
+      <main className="flex-1 flex items-center justify-center px-4">
+        <div className="w-full max-w-md bg-black/75 rounded p-16 animate-fade-in">
+          <h2 className="text-3xl font-medium mb-7">Sign In</h2>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-light mb-2 text-gray-300"
-              >
-                Email
-              </label>
               <input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/20 text-white placeholder-gray-500"
-                placeholder="you@example.com"
+                className="netflix-input w-full"
+                placeholder="Email address"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="netflix-btn w-full py-3 text-base disabled:opacity-50"
             >
-              {loading ? 'Sending...' : 'Send Magic Link'}
+              {loading ? 'Sending...' : 'Send Sign In Link'}
             </button>
 
             {message && (
               <p
-                className={`text-sm text-center ${
+                className={`text-sm ${
                   message.includes('Check your email')
-                    ? 'text-green-400'
-                    : 'text-red-400'
+                    ? 'text-green-500'
+                    : 'text-netflix-red'
                 }`}
               >
                 {message}
               </p>
             )}
           </form>
+
+          <div className="mt-8 pt-8 border-t border-gray-700">
+            <p className="text-netflix-gray text-sm mb-4">Quick access for demos</p>
+            <button
+              onClick={handleDemoLogin}
+              disabled={demoLoading}
+              className="netflix-btn-secondary w-full py-3 text-base disabled:opacity-50"
+            >
+              {demoLoading ? 'Loading...' : 'Continue as Guest'}
+            </button>
+          </div>
+
+          <p className="text-netflix-gray text-sm mt-8">
+            New to VibeWatch? Create groups and decide on movies together with friends.
+          </p>
         </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="px-8 py-6 text-netflix-gray text-sm">
+        <p>Group movie decision making</p>
+      </footer>
     </div>
   )
 }
@@ -106,7 +137,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900">
+      <div className="min-h-screen bg-netflix-dark flex items-center justify-center">
         <div className="text-white">Loading...</div>
       </div>
     }>

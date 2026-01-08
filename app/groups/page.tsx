@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
+import LogoutButton from '@/components/LogoutButton'
 
 export default async function GroupsPage() {
   const supabase = await createClient()
@@ -11,7 +12,6 @@ export default async function GroupsPage() {
     redirect('/login')
   }
 
-  // Get groups where user is a member
   const groups = await prisma.group.findMany({
     where: {
       members: {
@@ -34,59 +34,77 @@ export default async function GroupsPage() {
   })
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-light">Groups</h1>
-          <div className="flex gap-4 items-center">
+    <div className="min-h-screen bg-netflix-dark">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-netflix-dark to-transparent">
+        <div className="flex justify-between items-center px-8 py-4">
+          <Link href="/groups">
+            <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
+          </Link>
+          <div className="flex items-center gap-4">
+            <span className="text-netflix-gray text-sm">
+              {user.email || `Guest ${user.id.slice(0, 8)}`}
+            </span>
+            <LogoutButton />
+          </div>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="pt-24 px-8 pb-12">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-3xl font-medium">My Groups</h2>
             <Link
               href="/groups/create"
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-light transition-colors"
+              className="netflix-btn px-6 py-3"
             >
               Create Group
             </Link>
           </div>
-        </div>
 
-        {groups.length === 0 ? (
-          <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-12 text-center">
-            <p className="text-gray-400 mb-4">No groups yet</p>
-            <Link
-              href="/groups/create"
-              className="text-white/80 hover:text-white underline"
-            >
-              Create your first group
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {groups.map((group) => (
+          {groups.length === 0 ? (
+            <div className="bg-card-bg rounded p-12 text-center animate-fade-in">
+              <h3 className="text-xl mb-4">No groups yet</h3>
+              <p className="text-netflix-gray mb-6">
+                Create a group to start deciding on movies with friends
+              </p>
               <Link
-                key={group.id}
-                href={`/groups/${group.id}/watchlist`}
-                className="block backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-colors"
+                href="/groups/create"
+                className="netflix-btn px-8 py-3 inline-block"
               >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="text-xl font-light mb-2">
-                      Group {group.invite_code}
-                    </h2>
-                    <p className="text-sm text-gray-400">
-                      {group.members.length} member
-                      {group.members.length !== 1 ? 's' : ''} •{' '}
-                      {group._count.watchlists} movie
-                      {group._count.watchlists !== 1 ? 's' : ''} in watchlist
-                    </p>
-                  </div>
-                  <span className="text-xs text-gray-500">
-                    {new Date(group.created_at).toLocaleDateString()}
-                  </span>
-                </div>
+                Create Your First Group
               </Link>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
+              {groups.map((group) => (
+                <Link
+                  key={group.id}
+                  href={`/groups/${group.id}/watchlist`}
+                  className="netflix-card p-6 block"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="bg-netflix-red/20 text-netflix-red px-3 py-1 rounded text-sm font-medium">
+                      {group.invite_code.toUpperCase()}
+                    </div>
+                    <span className="text-netflix-gray text-xs">
+                      {new Date(group.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">
+                    Watch Group
+                  </h3>
+                  <div className="flex gap-4 text-sm text-netflix-gray">
+                    <span>{group.members.length} members</span>
+                    <span>{group._count.watchlists} movies</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   )
 }

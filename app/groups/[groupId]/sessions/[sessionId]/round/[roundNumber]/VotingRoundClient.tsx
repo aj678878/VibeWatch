@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import MovieCard from '@/components/MovieCard'
 
 interface UserVote {
@@ -53,25 +54,21 @@ export default function VotingRoundClient({
           setSessionStatus(data.session.status)
           setRoundId(data.currentRound.id)
 
-          // Update round status for async participation
           if (data.roundStatus) {
             setRoundStatus(data.roundStatus)
           }
 
-          // Update user votes
           const votesMap: Record<number, UserVote> = {}
           data.userVotes.forEach((v: UserVote) => {
             votesMap[v.movie_tmdb_id] = v
           })
           setUserVotes(votesMap)
 
-          // If session is completed, redirect to results
           if (data.session.status === 'completed') {
             router.push(`/groups/${groupId}/sessions/${sessionId}/results`)
             return
           }
 
-          // If round has advanced, redirect to new round
           if (data.session.current_round > roundNumber) {
             router.push(
               `/groups/${groupId}/sessions/${sessionId}/round/${data.session.current_round}`
@@ -79,9 +76,7 @@ export default function VotingRoundClient({
             return
           }
 
-          // Trigger next-round check when all members have voted (server validates)
           if (data.roundStatus?.isComplete && data.session.status === 'active') {
-            // Call next-round endpoint to check consensus and advance round
             fetch(`/api/sessions/${sessionId}/next-round`, {
               method: 'POST',
             }).catch(console.error)
@@ -92,12 +87,8 @@ export default function VotingRoundClient({
       }
     }
 
-    // Initial fetch
     pollStatus()
-
-    // Poll every 3 seconds
     const interval = setInterval(pollStatus, 3000)
-
     return () => clearInterval(interval)
   }, [sessionId, roundNumber, groupId, router])
 
@@ -127,7 +118,6 @@ export default function VotingRoundClient({
         throw new Error('Failed to submit vote')
       }
 
-      // Update local state
       setUserVotes((prev) => ({
         ...prev,
         [tmdbId]: {
@@ -145,42 +135,75 @@ export default function VotingRoundClient({
   }
 
   const allVoted = movieTmdbIds.every((id) => userVotes[id])
+  const votedCount = Object.keys(userVotes).length
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-light mb-2">Round {roundNumber}</h1>
-          <p className="text-gray-400">
-            Vote Yes or No on each movie. You can optionally provide a reason
-            for No votes.
-          </p>
-        </div>
-
-        {allVoted && roundStatus && !roundStatus.isComplete && (
-          <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-sm">
-            You&apos;ve voted on all movies. Waiting for {roundStatus.waitingForMembers} member{roundStatus.waitingForMembers !== 1 ? 's' : ''}...
+    <div className="min-h-screen bg-netflix-dark">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-netflix-dark via-netflix-dark/95 to-transparent">
+        <div className="flex justify-between items-center px-8 py-4">
+          <Link href="/groups">
+            <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
+          </Link>
+          <div className="text-sm text-netflix-gray">
+            Round {roundNumber} of 5
           </div>
-        )}
-        
-        {roundStatus && roundStatus.isComplete && (
-          <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 text-sm">
-            All members have voted. Processing round...
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {movieTmdbIds.map((tmdbId) => (
-            <MovieCard
-              key={tmdbId}
-              tmdbId={tmdbId}
-              onVote={handleVote}
-              userVote={userVotes[tmdbId]}
-              disabled={loading || sessionStatus !== 'active'}
-            />
-          ))}
         </div>
-      </div>
+      </header>
+
+      {/* Main content */}
+      <main className="pt-24 px-8 pb-12">
+        <div className="max-w-7xl mx-auto">
+          {/* Progress */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-medium">Vote on Movies</h2>
+              <span className="text-netflix-gray">
+                {votedCount} of {movieTmdbIds.length} voted
+              </span>
+            </div>
+            <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-netflix-red transition-all duration-300"
+                style={{ width: `${(votedCount / movieTmdbIds.length) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Status messages */}
+          {allVoted && roundStatus && !roundStatus.isComplete && (
+            <div className="bg-card-bg rounded p-4 mb-8 text-center">
+              <p className="text-netflix-gray">
+                You have voted on all movies. Waiting for {roundStatus.waitingForMembers} other {roundStatus.waitingForMembers === 1 ? 'member' : 'members'}...
+              </p>
+            </div>
+          )}
+          
+          {roundStatus && roundStatus.isComplete && (
+            <div className="bg-green-500/20 rounded p-4 mb-8 text-center">
+              <p className="text-green-400">
+                All members have voted. Processing results...
+              </p>
+            </div>
+          )}
+
+          {/* Movie grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {movieTmdbIds.map((tmdbId) => (
+              <MovieCard
+                key={tmdbId}
+                tmdbId={tmdbId}
+                onVote={handleVote}
+                userVote={userVotes[tmdbId] ? {
+                  vote: userVotes[tmdbId].vote,
+                  reason: userVotes[tmdbId].reason_text,
+                } : undefined}
+                disabled={loading || sessionStatus !== 'active'}
+              />
+            ))}
+          </div>
+        </div>
+      </main>
     </div>
   )
 }

@@ -2,13 +2,16 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function CreateGroupPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleCreate = async () => {
     setLoading(true)
+    setError('')
     try {
       const response = await fetch('/api/groups/create', {
         method: 'POST',
@@ -23,31 +26,50 @@ export default function CreateGroupPage() {
       router.push(`/groups/${group.id}/watchlist`)
     } catch (error: any) {
       console.error('Error creating group:', error)
-      alert(`Failed to create group: ${error.message || 'Unknown error'}`)
+      setError(error.message || 'Failed to create group')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-8">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-4xl font-light mb-8">Create Group</h1>
+    <div className="min-h-screen bg-netflix-dark">
+      {/* Header */}
+      <header className="px-8 py-4">
+        <Link href="/groups">
+          <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
+        </Link>
+      </header>
 
-        <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-8">
-          <p className="text-gray-300 mb-6">
-            Create a new group to start deciding on movies together.
+      <main className="flex items-center justify-center px-4 pt-12">
+        <div className="w-full max-w-lg bg-card-bg rounded p-12 animate-fade-in">
+          <Link
+            href="/groups"
+            className="text-netflix-gray text-sm hover:text-white transition-colors inline-block mb-6"
+          >
+            Back to Groups
+          </Link>
+          
+          <h2 className="text-3xl font-medium mb-4">Create a Group</h2>
+          <p className="text-netflix-gray mb-8">
+            Start a new watch group and invite friends to decide on movies together.
           </p>
+
+          {error && (
+            <div className="bg-netflix-red/20 text-netflix-red p-4 rounded mb-6 text-sm">
+              {error}
+            </div>
+          )}
 
           <button
             onClick={handleCreate}
             disabled={loading}
-            className="w-full py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="netflix-btn w-full py-4 text-lg disabled:opacity-50"
           >
             {loading ? 'Creating...' : 'Create Group'}
           </button>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

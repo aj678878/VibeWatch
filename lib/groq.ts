@@ -101,6 +101,88 @@ Be specific and only include constraints you can confidently infer. If uncertain
   }
 }
 
+/**
+ * Get a movie recommendation for solo users based on their votes and vibe.
+ * Takes all choices (yes/no) and uses them to recommend a new movie.
+ */
+export async function recommendMovieForSoloUser(
+  vibeText: string,
+  votes: Array<{
+    movie_tmdb_id: number
+    vote: 'yes' | 'no'
+    reason_text?: string | null
+  }>,
+  shownMovieIds: number[]
+): Promise<{
+  tmdb_id: number
+  title: string
+  reason: string
+}> {
+  const yesVotes = votes.filter((v) => v.vote === 'yes')
+  const noVotes = votes.filter((v) => v.vote === 'no')
+
+  const prompt = `You are a movie recommendation assistant helping a single user find the perfect movie.
+
+User's mood/vibe: "${vibeText}"
+
+Movies the user LIKED (voted YES):
+${yesVotes.length > 0 ? yesVotes.map(v => `- Movie ID: ${v.movie_tmdb_id}`).join('\n') : '- None'}
+
+Movies the user REJECTED (voted NO):
+${noVotes.map(v => `- Movie ID: ${v.movie_tmdb_id}${v.reason_text ? ` (reason: "${v.reason_text}")` : ''}`).join('\n') || '- None'}
+
+Movies already shown (do not recommend these): ${shownMovieIds.join(', ')}
+
+Based on this information, recommend ONE movie that:
+1. Matches the user's stated vibe/mood
+2. Is similar to movies they liked (if any)
+3. Avoids characteristics of movies they rejected
+4. Has NOT been shown before
+
+Return ONLY a JSON object:
+{
+  "tmdb_id": 123,
+  "title": "Movie Title",
+  "reason": "Brief explanation of why this movie fits their preferences"
+}
+
+The tmdb_id MUST be a valid TMDB movie ID for a real movie.`
+
+  try {
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a movie recommendation expert. You have extensive knowledge of movies and their TMDB IDs. Recommend movies that match user preferences. Return only valid JSON.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      model: 'mixtral-8x7b-32768',
+      temperature: 0.7,
+      response_format: { type: 'json_object' },
+    })
+
+    const content = completion.choices[0]?.message?.content
+    if (!content) {
+      throw new Error('No response from Groq')
+    }
+
+    const result = JSON.parse(content) as {
+      tmdb_id: number
+      title: string
+      reason: string
+    }
+
+    return result
+  } catch (error) {
+    console.error('Error getting solo recommendation:', error)
+    throw error
+  }
+}
+
 export async function recommendMovies(
   vibeText: string,
   allVotes: Array<{

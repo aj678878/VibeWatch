@@ -2,9 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Netflix-inspired color scheme */
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --background: #141414;
+  --foreground: #ffffff;
+  --netflix-red: #e50914;
+  --netflix-red-hover: #f40612;
+  --netflix-dark: #141414;
+  --netflix-gray: #808080;
+  --netflix-light-gray: #b3b3b3;
+  --card-bg: #181818;
+  --card-hover: #252525;
 }
 
 * {
@@ -22,30 +30,98 @@ body {
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  font-weight: 300;
+  font-family: 'Netflix Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glassmorphic effects */
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Netflix card effects */
 @layer utilities {
-  .glass {
-    backdrop-filter: blur(16px);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+  .netflix-card {
+    background: var(--card-bg);
+    border-radius: 4px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
 
-  .glass-hover {
+  .netflix-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+  }
+
+  .netflix-btn {
+    background: var(--netflix-red);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
     transition: background-color 0.2s ease;
   }
 
-  .glass-hover:hover {
-    background: rgba(255, 255, 255, 0.1);
+  .netflix-btn:hover {
+    background: var(--netflix-red-hover);
+  }
+
+  .netflix-btn-secondary {
+    background: rgba(109, 109, 110, 0.7);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+  }
+
+  .netflix-btn-secondary:hover {
+    background: rgba(109, 109, 110, 0.4);
+  }
+
+  .netflix-input {
+    background: #333;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    padding: 16px;
+    font-size: 16px;
+  }
+
+  .netflix-input:focus {
+    outline: none;
+    background: #454545;
+  }
+
+  .netflix-input::placeholder {
+    color: #8c8c8c;
   }
 }
 
 /* Line clamp utilities */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -58,4 +134,25 @@ body {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Horizontal scroll for carousels */
+.netflix-scroll {
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.netflix-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Gradient overlays */
+.gradient-top {
+  background: linear-gradient(to bottom, rgba(20, 20, 20, 1) 0%, rgba(20, 20, 20, 0) 100%);
+}
+
+.gradient-bottom {
+  background: linear-gradient(to top, rgba(20, 20, 20, 1) 0%, rgba(20, 20, 20, 0) 100%);
 }

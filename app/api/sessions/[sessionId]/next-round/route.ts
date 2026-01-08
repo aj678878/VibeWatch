@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { selectNextRoundMovies } from '@/lib/ai/movie-selector'
-import { recommendMovies } from '@/lib/groq'
+import { recommendMovies, recommendMovieForSoloUser } from '@/lib/groq'
 
 export async function POST(
   request: Request,
@@ -71,6 +71,7 @@ export async function POST(
     const memberIds = session.group.members.map((m) => m.user_id)
     const movieIds = currentRound.movie_tmdb_ids as number[]
     const allVotes = currentRound.votes
+    const totalMembers = memberIds.length
 
     const allMembersVoted = memberIds.every((memberId) =>
       movieIds.every((tmdbId) =>
@@ -87,7 +88,87 @@ export async function POST(
       )
     }
 
-    // Check for consensus (at least 2 YES votes on same movie for 3-person groups)
+    // SOLO MODE: Always use Groq to recommend based on all votes
+    if (totalMembers === 1) {
+      try {
+        // Collect all votes from current round
+        const currentRoundVotes = currentRound.votes.map((v) => ({
+          movie_tmdb_id: v.movie_tmdb_id,
+          vote: v.vote as 'yes' | 'no',
+          reason_text: v.reason_text,
+        }))
+
+        // Get all shown movie IDs to avoid recommending them
+        const shownMovieIds = session.rounds.flatMap(
+          (r) => r.movie_tmdb_ids as number[]
+        )
+
+        // Get AI recommendation based on solo user's votes
+        const recommendation = await recommendMovieForSoloUser(
+          session.vibe_text,
+          currentRoundVotes,
+          shownMovieIds
+        )
+
+        // Update session with final movie
+        await prisma.decisionSession.update({
+          where: { id: sessionId },
+          data: {
+            status: 'completed',
+            final_movie_tmdb_id: recommendation.tmdb_id,
+          },
+        })
+
+        // Add chosen movie to group watchlist
+        const existing = await prisma.groupWatchlist.findUnique({
+          where: {
+            group_id_tmdb_id: {
+              group_id: session.group_id,
+              tmdb_id: recommendation.tmdb_id,
+            },
+          },
+        })
+
+        if (!existing) {
+          await prisma.groupWatchlist.create({
+            data: {
+              group_id: session.group_id,
+              tmdb_id: recommendation.tmdb_id,
+            },
+          })
+        }
+
+        return NextResponse.json({
+          consensus: true, // Keep UI ambiguous
+          final_movie_tmdb_id: recommendation.tmdb_id,
+          soloMode: true,
+        })
+      } catch (error) {
+        console.error('Error getting solo recommendation:', error)
+        // Fallback: use first YES vote or first movie if no YES votes
+        const yesVote = allVotes.find((v) => v.vote === 'yes')
+        const fallbackMovieId = yesVote?.movie_tmdb_id || movieIds[0]
+
+        await prisma.decisionSession.update({
+          where: { id: sessionId },
+          data: {
+            status: 'completed',
+            final_movie_tmdb_id: fallbackMovieId,
+          },
+        })
+
+        return NextResponse.json({
+          consensus: true,
+          final_movie_tmdb_id: fallbackMovieId,
+          soloMode: true,
+          fallback: true,
+        })
+      }
+    }
+
+    // MULTI-USER MODE: Check for consensus
+    const requiredYesVotes = Math.ceil(totalMembers / 2) + (totalMembers % 2 === 0 ? 1 : 0)
+    
     const yesVotesByMovie: Record<number, number> = {}
     movieIds.forEach((tmdbId) => {
       const yesVotes = allVotes.filter(
@@ -96,9 +177,9 @@ export async function POST(
       yesVotesByMovie[tmdbId] = yesVotes.length
     })
 
-    // Find movies with at least 2 YES votes
+    // Find movies that meet consensus threshold
     const consensusMovies = Object.entries(yesVotesByMovie)
-      .filter(([_, count]) => count >= 2)
+      .filter(([_, count]) => count >= requiredYesVotes)
       .map(([tmdbId]) => parseInt(tmdbId))
 
     if (consensusMovies.length > 0) {
@@ -113,7 +194,7 @@ export async function POST(
         },
       })
 
-      // Add chosen movie to group watchlist (if not already there)
+      // Add chosen movie to group watchlist
       const existing = await prisma.groupWatchlist.findUnique({
         where: {
           group_id_tmdb_id: {
@@ -142,8 +223,7 @@ export async function POST(
     if (session.current_round >= 5) {
       // Trigger final AI resolution
       try {
-        // Get all votes from all rounds
-        const allVotes = session.rounds.flatMap((round) =>
+        const allSessionVotes = session.rounds.flatMap((round) =>
           round.votes.map((v) => ({
             movie_tmdb_id: v.movie_tmdb_id,
             vote: v.vote as 'yes' | 'no',
@@ -151,24 +231,20 @@ export async function POST(
           }))
         )
 
-        // Prepare round history
         const roundHistory = session.rounds.map((round) => ({
           round_number: round.round_number,
           movie_tmdb_ids: round.movie_tmdb_ids as number[],
         }))
 
-        // Get watchlist IDs
         const watchlistTmdbIds = session.group.watchlists.map((w) => w.tmdb_id)
 
-        // Get AI recommendation
         const recommendation = await recommendMovies(
           session.vibe_text,
-          allVotes,
+          allSessionVotes,
           roundHistory,
           watchlistTmdbIds
         )
 
-        // Update session with final movie
         await prisma.decisionSession.update({
           where: { id: sessionId },
           data: {
@@ -177,7 +253,6 @@ export async function POST(
           },
         })
 
-        // Add chosen movie to group watchlist (if not already there)
         const existing = await prisma.groupWatchlist.findUnique({
           where: {
             group_id_tmdb_id: {
@@ -213,7 +288,6 @@ export async function POST(
 
     // Need to generate next round
     try {
-      // Prepare round history for AI
       const roundHistory = session.rounds.map((round) => ({
         round_number: round.round_number,
         movie_tmdb_ids: round.movie_tmdb_ids as number[],
@@ -230,10 +304,8 @@ export async function POST(
         reason_text: v.reason_text,
       }))
 
-      // Get watchlist IDs
       const watchlistTmdbIds = session.group.watchlists.map((w) => w.tmdb_id)
 
-      // Use AI to select next round movies
       const nextRoundMovies = await selectNextRoundMovies(
         session.vibe_text,
         currentRoundVotes,
@@ -241,7 +313,6 @@ export async function POST(
         watchlistTmdbIds
       )
 
-      // Create next round
       const nextRoundNumber = session.current_round + 1
       await prisma.votingRound.create({
         data: {
@@ -251,7 +322,6 @@ export async function POST(
         },
       })
 
-      // Update session current round
       await prisma.decisionSession.update({
         where: { id: sessionId },
         data: {

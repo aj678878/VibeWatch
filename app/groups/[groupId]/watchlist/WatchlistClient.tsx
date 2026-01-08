@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import MovieSearch from '@/components/MovieSearch'
 import Watchlist from '@/components/Watchlist'
+import LogoutButton from '@/components/LogoutButton'
 
 interface GroupMember {
   id: string
@@ -40,7 +42,6 @@ export default function WatchlistClient({
 }: WatchlistClientProps) {
   const router = useRouter()
   const [watchlist, setWatchlist] = useState(initialWatchlist)
-  const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const copyInviteLink = async () => {
@@ -50,8 +51,6 @@ export default function WatchlistClient({
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
-      console.error('Failed to copy:', error)
-      // Fallback: select text
       const textArea = document.createElement('textarea')
       textArea.value = inviteUrl
       document.body.appendChild(textArea)
@@ -63,16 +62,14 @@ export default function WatchlistClient({
     }
   }
 
-  const handleMovieAdded = (movie: any) => {
-    // Refresh watchlist
+  const handleMovieAdded = () => {
     fetch(`/api/groups/${group.id}/watchlist`)
       .then((res) => res.json())
       .then((data) => setWatchlist(data.watchlist || []))
       .catch(console.error)
   }
 
-  const handleStartDecision = async () => {
-    // Remove watchlist requirement - sessions now use vibe_text with TMDB
+  const handleStartDecision = () => {
     router.push(`/groups/${group.id}/sessions/new`)
   }
 
@@ -83,63 +80,88 @@ export default function WatchlistClient({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-light mb-2">Group Watchlist</h1>
-            <div className="flex items-center gap-3 mt-2">
-              <p className="text-gray-400 text-sm">
-                Invite code: <span className="font-mono">{group.invite_code}</span>
-              </p>
-              <button
-                onClick={copyInviteLink}
-                className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-light transition-colors"
-              >
-                {copied ? 'Copied!' : 'Copy Invite Link'}
-              </button>
+    <div className="min-h-screen bg-netflix-dark">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-netflix-dark via-netflix-dark/95 to-transparent">
+        <div className="flex justify-between items-center px-8 py-4">
+          <Link href="/groups">
+            <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
+          </Link>
+          <LogoutButton />
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="pt-24 px-8 pb-12">
+        <div className="max-w-7xl mx-auto">
+          {/* Back navigation */}
+          <Link
+            href="/groups"
+            className="text-netflix-gray text-sm hover:text-white transition-colors inline-block mb-6"
+          >
+            Back to Groups
+          </Link>
+
+          {/* Group header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div>
+              <h2 className="text-3xl font-medium mb-2">Watch Group</h2>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="bg-netflix-red/20 text-netflix-red px-3 py-1 rounded font-medium">
+                  {group.invite_code.toUpperCase()}
+                </span>
+                <button
+                  onClick={copyInviteLink}
+                  className="text-netflix-gray hover:text-white transition-colors"
+                >
+                  {copied ? 'Copied' : 'Copy invite link'}
+                </button>
+                <span className="text-netflix-gray">
+                  {group.members.length} {group.members.length === 1 ? 'member' : 'members'}
+                </span>
+              </div>
             </div>
-            <p className="text-gray-400 text-sm mt-1">
-              {group.members.length} member{group.members.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <div className="flex gap-4">
-            {activeSession ? (
-              <button
-                onClick={handleContinueSession}
-                className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-light transition-colors"
-              >
-                Continue Session (Round {activeSession.current_round})
-              </button>
-            ) : (
-              <button
-                onClick={handleStartDecision}
-                className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-light transition-colors"
-              >
-                Start Decision
-              </button>
-            )}
-          </div>
-        </div>
 
-        <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-6 mb-8">
-          <h2 className="text-xl font-light mb-4">Add Movies</h2>
-          <MovieSearch onSelectMovie={handleMovieAdded} groupId={group.id} />
-        </div>
+            <div className="flex gap-3">
+              {activeSession ? (
+                <button
+                  onClick={handleContinueSession}
+                  className="netflix-btn px-6 py-3"
+                >
+                  Continue Session - Round {activeSession.current_round}
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartDecision}
+                  className="netflix-btn px-6 py-3"
+                >
+                  Start Decision
+                </button>
+              )}
+            </div>
+          </div>
 
-        <div>
-          <h2 className="text-2xl font-light mb-6">
-            Watchlist ({watchlist.length})
-          </h2>
-          <Watchlist
-            items={watchlist}
-            groupId={group.id}
-            onRemove={(tmdbId) => {
-              setWatchlist((prev) => prev.filter((item) => item.tmdb_id !== tmdbId))
-            }}
-          />
+          {/* Search section */}
+          <section className="mb-12">
+            <h3 className="text-xl font-medium mb-4">Add Movies</h3>
+            <MovieSearch onSelectMovie={handleMovieAdded} groupId={group.id} />
+          </section>
+
+          {/* Watchlist section */}
+          <section>
+            <h3 className="text-xl font-medium mb-4">
+              Watchlist <span className="text-netflix-gray font-normal">({watchlist.length})</span>
+            </h3>
+            <Watchlist
+              items={watchlist}
+              groupId={group.id}
+              onRemove={(tmdbId) => {
+                setWatchlist((prev) => prev.filter((item) => item.tmdb_id !== tmdbId))
+              }}
+            />
+          </section>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

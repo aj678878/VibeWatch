@@ -14,9 +14,9 @@ export default function LogoutButton() {
   return (
     <button
       onClick={handleLogout}
-      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg font-light text-sm transition-colors"
+      className="netflix-btn-secondary px-4 py-2 text-sm"
     >
-      Logout
+      Sign Out
     </button>
   )
 }
