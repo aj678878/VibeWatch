@@ -36,7 +36,7 @@ export default async function ResultsPage({
   // Verify requester is an active participant in this group
   if (!currentParticipant) redirect('/groups')
   const isActiveParticipant = session.group.participants.some(
-    (p) => p.id === currentParticipant.participantId
+    (p) => p.id === currentParticipant.id
   )
   if (!isActiveParticipant) redirect('/groups')
 

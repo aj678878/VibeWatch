@@ -14,14 +14,17 @@ export default async function GroupsPage() {
 
   const groups = await prisma.group.findMany({
     where: {
-      members: {
+      participants: {
         some: {
           user_id: user.id,
+          status: 'active',
         },
       },
     },
     include: {
-      members: true,
+      participants: {
+        where: { status: 'active' },
+      },
       _count: {
         select: {
           watchlists: true,
