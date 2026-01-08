@@ -103,6 +103,16 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Check if session is already completed (idempotency check)
+    if (round.session.status === 'completed') {
+      return NextResponse.json({
+        success: true,
+        roundComplete: true,
+        sessionCompleted: true,
+        finalMovieTmdbId: round.session.final_movie_tmdb_id,
+      })
+    }
+
     // Check if round is complete (all active participants have voted on all 5 movies)
     const activeParticipants = round.session.group.participants
     const roundVotes = await prisma.vote.findMany({
@@ -193,22 +203,32 @@ export async function POST(request: NextRequest) {
     }
 
     // MULTI-USER MODE: Check for consensus
-    const consensusMovies: number[] = []
+    // Consensus rule:
+    // - For odd number of members: YES > NO (majority)
+    // - For even number of members: YES > NO (strict majority, tie = no consensus)
+    // - NO votes must be 0 for consensus
+    const consensusMovies: Array<{ movieId: number; yesCount: number }> = []
     
     for (const movieId of movieIds) {
       const movieVotes = roundVotes.filter((v) => v.movie_tmdb_id === movieId)
       const yesCount = movieVotes.filter((v) => v.vote === 'yes').length
       const noCount = movieVotes.filter((v) => v.vote === 'no').length
 
-      // Consensus rule: YES >= 2 AND NO == 0 (for 3-person groups)
-      if (yesCount >= 2 && noCount === 0) {
-        consensusMovies.push(movieId)
+      // Check if this movie has consensus
+      // For even number: YES must be > NO (strict majority, tie = no consensus)
+      // For odd number: YES must be > NO (majority)
+      const hasConsensus = noCount === 0 && yesCount > (totalParticipants - yesCount)
+
+      if (hasConsensus) {
+        consensusMovies.push({ movieId, yesCount })
       }
     }
 
     if (consensusMovies.length > 0) {
-      // Consensus reached - finalize session
-      const finalMovieId = consensusMovies[0]
+      // Consensus reached - select most popular (highest YES count)
+      // Sort by YES count descending, then take the first one
+      consensusMovies.sort((a, b) => b.yesCount - a.yesCount)
+      const finalMovieId = consensusMovies[0].movieId
 
       await prisma.decisionSession.update({
         where: { id: round.session_id },

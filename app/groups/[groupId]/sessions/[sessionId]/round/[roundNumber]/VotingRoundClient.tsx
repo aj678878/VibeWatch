@@ -86,11 +86,8 @@ export default function VotingRoundClient({
             return
           }
 
-          if (data.roundStatus?.isComplete && data.session.status === 'active') {
-            fetch(`/api/sessions/${sessionId}/next-round`, {
-              method: 'POST',
-            }).catch(console.error)
-          }
+          // Don't call next-round - vote submission route handles round completion
+          // Just wait for status to change to 'completed' via polling
         }
       } catch (error) {
         console.error('Error polling status:', error)
