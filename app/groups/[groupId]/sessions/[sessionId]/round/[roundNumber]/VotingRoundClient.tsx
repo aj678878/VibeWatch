@@ -36,6 +36,12 @@ export default function VotingRoundClient({
   const [loading, setLoading] = useState(false)
   const [roundId, setRoundId] = useState<string | null>(null)
   const [sessionStatus, setSessionStatus] = useState<string>('active')
+  const [roundStatus, setRoundStatus] = useState<{
+    membersVoted: number
+    totalMembers: number
+    waitingForMembers: number
+    isComplete: boolean
+  } | null>(null)
 
   // Poll for session status
   useEffect(() => {
@@ -46,6 +52,11 @@ export default function VotingRoundClient({
           const data = await response.json()
           setSessionStatus(data.session.status)
           setRoundId(data.currentRound.id)
+
+          // Update round status for async participation
+          if (data.roundStatus) {
+            setRoundStatus(data.roundStatus)
+          }
 
           // Update user votes
           const votesMap: Record<number, UserVote> = {}
@@ -68,9 +79,9 @@ export default function VotingRoundClient({
             return
           }
 
-          // Check if all members have voted and trigger next round or final resolution
-          if (data.hasVotedOnAll && data.session.status === 'active') {
-            // Call next-round endpoint to check consensus and progress
+          // Trigger next-round check when all members have voted (server validates)
+          if (data.roundStatus?.isComplete && data.session.status === 'active') {
+            // Call next-round endpoint to check consensus and advance round
             fetch(`/api/sessions/${sessionId}/next-round`, {
               method: 'POST',
             }).catch(console.error)
@@ -146,9 +157,15 @@ export default function VotingRoundClient({
           </p>
         </div>
 
-        {allVoted && (
+        {allVoted && roundStatus && !roundStatus.isComplete && (
           <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-sm">
-            You&apos;ve voted on all movies. Waiting for other members...
+            You&apos;ve voted on all movies. Waiting for {roundStatus.waitingForMembers} member{roundStatus.waitingForMembers !== 1 ? 's' : ''}...
+          </div>
+        )}
+        
+        {roundStatus && roundStatus.isComplete && (
+          <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 text-sm">
+            All members have voted. Processing round...
           </div>
         )}
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { selectInitialRoundMovies } from '@/lib/ai/movie-selector'
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,21 +53,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get watchlist movies
-    const watchlist = await prisma.groupWatchlist.findMany({
-      where: { group_id: groupId },
-    })
+    // Select initial round movies based on vibe_text (NOT watchlist)
+    // This uses TMDB search to find 5 candidate movies matching the vibe
+    const firstRoundMovies = await selectInitialRoundMovies(vibeText)
 
-    if (watchlist.length < 5) {
+    // Validate we got 5 valid movie IDs
+    if (!Array.isArray(firstRoundMovies) || firstRoundMovies.length !== 5) {
       return NextResponse.json(
-        { error: 'Watchlist must have at least 5 movies' },
-        { status: 400 }
+        { error: 'Failed to find 5 movies matching your vibe. Please try a different description.' },
+        { status: 500 }
       )
     }
 
-    // Select 5 random movies for first round
-    const shuffled = [...watchlist].sort(() => 0.5 - Math.random())
-    const firstRoundMovies = shuffled.slice(0, 5).map((item) => item.tmdb_id)
+    // Ensure all IDs are valid numbers
+    const validMovieIds = firstRoundMovies.filter((id) => 
+      typeof id === 'number' && !isNaN(id) && id > 0
+    )
+
+    if (validMovieIds.length !== 5) {
+      return NextResponse.json(
+        { error: 'Invalid movie IDs generated. Please try again.' },
+        { status: 500 }
+      )
+    }
 
     // Create session
     const session = await prisma.decisionSession.create({
@@ -78,7 +87,7 @@ export async function POST(request: NextRequest) {
         rounds: {
           create: {
             round_number: 1,
-            movie_tmdb_ids: firstRoundMovies,
+            movie_tmdb_ids: validMovieIds, // Store as JSON array of numbers
           },
         },
       },

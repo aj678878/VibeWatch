@@ -64,17 +64,19 @@ export default function MovieSearch({ onSelectMovie, groupId }: MovieSearchProps
         method: 'POST',
       })
 
+      const data = await response.json().catch(() => ({ error: 'Failed to parse response' }))
+
       if (response.ok) {
         onSelectMovie(movie)
         setQuery('')
         setResults([])
       } else {
-        const data = await response.json()
+        console.error('Error adding to watchlist:', data)
         alert(data.error || 'Failed to add movie to watchlist')
       }
     } catch (error) {
       console.error('Error adding movie:', error)
-      alert('Failed to add movie to watchlist')
+      alert('Failed to add movie to watchlist. Please try again.')
     } finally {
       setAdding(null)
     }

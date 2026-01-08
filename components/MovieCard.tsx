@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { getPosterUrl, getMovieDetails, type TMDBMovie } from '@/lib/tmdb'
+import { getPosterUrl, type TMDBMovie } from '@/lib/tmdb'
 
 interface MovieCardProps {
   tmdbId: number
@@ -25,10 +25,15 @@ export default function MovieCard({
   useEffect(() => {
     const fetchMovie = async () => {
       try {
-        const movieData = await getMovieDetails(tmdbId)
+        const response = await fetch(`/api/tmdb/movie/${tmdbId}`)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch movie: ${response.statusText}`)
+        }
+        const movieData: TMDBMovie = await response.json()
         setMovie(movieData)
       } catch (error) {
         console.error('Error fetching movie:', error)
+        // Keep loading false so error state shows
       } finally {
         setLoading(false)
       }
@@ -68,7 +73,8 @@ export default function MovieCard({
   if (!movie) {
     return (
       <div className="backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 p-6">
-        <p className="text-gray-400">Movie not found</p>
+        <p className="text-gray-400">Failed to load movie (ID: {tmdbId})</p>
+        <p className="text-xs text-gray-500 mt-2">Check console for errors</p>
       </div>
     )
   }

@@ -41,6 +41,27 @@ export default function WatchlistClient({
   const router = useRouter()
   const [watchlist, setWatchlist] = useState(initialWatchlist)
   const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const copyInviteLink = async () => {
+    const inviteUrl = `${window.location.origin}/groups/join/${group.invite_code}`
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy:', error)
+      // Fallback: select text
+      const textArea = document.createElement('textarea')
+      textArea.value = inviteUrl
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   const handleMovieAdded = (movie: any) => {
     // Refresh watchlist
@@ -51,11 +72,7 @@ export default function WatchlistClient({
   }
 
   const handleStartDecision = async () => {
-    if (watchlist.length < 5) {
-      alert('Please add at least 5 movies to the watchlist before starting a decision session.')
-      return
-    }
-
+    // Remove watchlist requirement - sessions now use vibe_text with TMDB
     router.push(`/groups/${group.id}/sessions/new`)
   }
 
@@ -71,9 +88,17 @@ export default function WatchlistClient({
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-light mb-2">Group Watchlist</h1>
-            <p className="text-gray-400 text-sm">
-              Invite code: <span className="font-mono">{group.invite_code}</span>
-            </p>
+            <div className="flex items-center gap-3 mt-2">
+              <p className="text-gray-400 text-sm">
+                Invite code: <span className="font-mono">{group.invite_code}</span>
+              </p>
+              <button
+                onClick={copyInviteLink}
+                className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-light transition-colors"
+              >
+                {copied ? 'Copied!' : 'Copy Invite Link'}
+              </button>
+            </div>
             <p className="text-gray-400 text-sm mt-1">
               {group.members.length} member{group.members.length !== 1 ? 's' : ''}
             </p>
@@ -89,8 +114,7 @@ export default function WatchlistClient({
             ) : (
               <button
                 onClick={handleStartDecision}
-                disabled={watchlist.length < 5}
-                className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-light transition-colors"
               >
                 Start Decision
               </button>

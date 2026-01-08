@@ -89,6 +89,27 @@ export async function POST(
       },
     })
 
+    // Add chosen movie to group watchlist (if not already there)
+    const existing = await prisma.groupWatchlist.findUnique({
+      where: {
+        group_id_tmdb_id: {
+          group_id: session.group_id,
+          tmdb_id: recommendation.topPick.tmdb_id,
+        },
+      },
+    })
+
+    if (!existing) {
+      await prisma.groupWatchlist.create({
+        data: {
+          group_id: session.group_id,
+          tmdb_id: recommendation.topPick.tmdb_id,
+        },
+      })
+    }
+
+    // Optionally add alternates as suggestions (skip for MVP simplicity)
+
     return NextResponse.json({
       success: true,
       recommendation,

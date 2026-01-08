@@ -1,6 +1,46 @@
 import { searchMovies, getMovieDetails, type TMDBMovie } from '@/lib/tmdb'
 import { extractPreferences, type PreferenceConstraints } from '@/lib/groq'
 
+/**
+ * Select initial round movies based on vibe text.
+ * Uses TMDB search (optionally Groq-assisted) to find 5 candidate movies.
+ * Does NOT depend on watchlist.
+ */
+export async function selectInitialRoundMovies(vibeText: string): Promise<number[]> {
+  try {
+    // For MVP: Search TMDB with vibe text as query
+    // In future, could use Groq to extract search terms from vibe text first
+    const searchResults = await searchMovies(vibeText, 1)
+    
+    // Get first 5 movie IDs from search results
+    const movieIds = searchResults.results
+      .slice(0, 5)
+      .map((movie) => movie.id)
+      .filter((id) => !isNaN(id) && id > 0) // Validate IDs are valid numbers
+
+    if (movieIds.length < 5) {
+      // If we don't have 5, try a broader search or fill with popular movies
+      console.warn(`Only found ${movieIds.length} movies for vibe: ${vibeText}`)
+      
+      // Try searching for "popular" as fallback
+      const popularResults = await searchMovies('popular', 1)
+      const popularIds = popularResults.results
+        .map((movie) => movie.id)
+        .filter((id) => !isNaN(id) && id > 0 && !movieIds.includes(id))
+        .slice(0, 5 - movieIds.length)
+      
+      movieIds.push(...popularIds)
+    }
+
+    // Ensure we return exactly 5 movies (or as many as possible)
+    return movieIds.slice(0, 5)
+  } catch (error) {
+    console.error('Error selecting initial round movies:', error)
+    // Fallback: return empty array (will be caught by validation in API route)
+    throw new Error(`Failed to find movies for vibe: ${vibeText}`)
+  }
+}
+
 export async function selectNextRoundMovies(
   vibeText: string,
   currentRoundVotes: Array<{

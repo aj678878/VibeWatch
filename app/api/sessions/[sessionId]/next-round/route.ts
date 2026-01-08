@@ -113,6 +113,25 @@ export async function POST(
         },
       })
 
+      // Add chosen movie to group watchlist (if not already there)
+      const existing = await prisma.groupWatchlist.findUnique({
+        where: {
+          group_id_tmdb_id: {
+            group_id: session.group_id,
+            tmdb_id: finalMovieTmdbId,
+          },
+        },
+      })
+
+      if (!existing) {
+        await prisma.groupWatchlist.create({
+          data: {
+            group_id: session.group_id,
+            tmdb_id: finalMovieTmdbId,
+          },
+        })
+      }
+
       return NextResponse.json({
         consensus: true,
         final_movie_tmdb_id: finalMovieTmdbId,
@@ -157,6 +176,25 @@ export async function POST(
             final_movie_tmdb_id: recommendation.topPick.tmdb_id,
           },
         })
+
+        // Add chosen movie to group watchlist (if not already there)
+        const existing = await prisma.groupWatchlist.findUnique({
+          where: {
+            group_id_tmdb_id: {
+              group_id: session.group_id,
+              tmdb_id: recommendation.topPick.tmdb_id,
+            },
+          },
+        })
+
+        if (!existing) {
+          await prisma.groupWatchlist.create({
+            data: {
+              group_id: session.group_id,
+              tmdb_id: recommendation.topPick.tmdb_id,
+            },
+          })
+        }
 
         return NextResponse.json({
           consensus: false,

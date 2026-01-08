@@ -71,6 +71,24 @@ export async function GET(
       userVotes.some((vote) => vote.movie_tmdb_id === tmdbId)
     )
 
+    // Check how many members have voted on all movies in this round
+    const memberIds = session.group.members.map((m) => m.user_id)
+    const allVotesInRound = await prisma.vote.findMany({
+      where: { round_id: currentRound.id },
+    })
+
+    // Count members who have voted on all movies
+    const membersVotedCount = memberIds.filter((memberId) =>
+      movieIds.every((tmdbId) =>
+        allVotesInRound.some(
+          (vote) => vote.user_id === memberId && vote.movie_tmdb_id === tmdbId
+        )
+      )
+    ).length
+
+    const totalMembers = memberIds.length
+    const waitingCount = totalMembers - membersVotedCount
+
     return NextResponse.json({
       session: {
         id: session.id,
@@ -89,6 +107,13 @@ export async function GET(
         reason_text: v.reason_text,
       })),
       hasVotedOnAll,
+      // Async session info (do not reveal vote counts or identities)
+      roundStatus: {
+        membersVoted: membersVotedCount,
+        totalMembers: totalMembers,
+        waitingForMembers: waitingCount,
+        isComplete: waitingCount === 0,
+      },
     })
   } catch (error) {
     console.error('Error fetching session status:', error)
