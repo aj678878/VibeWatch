@@ -3,34 +3,52 @@ import { extractPreferences, type PreferenceConstraints } from '@/lib/groq'
 
 /**
  * Select initial round movies based on vibe text.
- * Uses TMDB search (optionally Groq-assisted) to find 5 candidate movies.
+ * Uses TMDB search with filters (Hindi/English, after 2000, sorted by popularity).
  * Does NOT depend on watchlist.
  */
 export async function selectInitialRoundMovies(vibeText: string): Promise<number[]> {
   try {
-    // For MVP: Search TMDB with vibe text as query
-    // In future, could use Groq to extract search terms from vibe text first
+    console.log('=== MOVIE SELECTION DEBUG ===')
+    console.log('Vibe text:', vibeText)
+    console.log('Search parameters:')
+    console.log('  - Languages: Hindi (hi) or English (en)')
+    console.log('  - Year: 2000 onwards')
+    console.log('  - Sort: Popularity (desc)')
+    console.log('  - Limit: Top 5')
+    
+    // Search TMDB with vibe text as query
     const searchResults = await searchMovies(vibeText, 1)
     
-    // Get first 5 movie IDs from search results
+    console.log('TMDB Search Results:')
+    console.log('  - Total results:', searchResults.total_results)
+    console.log('  - Results returned:', searchResults.results.length)
+    console.log('  - Top 5 movies:')
+    searchResults.results.slice(0, 5).forEach((movie, idx) => {
+      console.log(`    ${idx + 1}. [${movie.id}] ${movie.title} (${movie.release_date?.split('-')[0] || 'N/A'}) - Lang: ${movie.original_language}, Popularity: ${movie.popularity?.toFixed(2) || 'N/A'}`)
+    })
+    
+    // Get first 5 movie IDs from search results (already sorted by popularity)
     const movieIds = searchResults.results
       .slice(0, 5)
       .map((movie) => movie.id)
       .filter((id) => !isNaN(id) && id > 0) // Validate IDs are valid numbers
 
     if (movieIds.length < 5) {
-      // If we don't have 5, try a broader search or fill with popular movies
-      console.warn(`Only found ${movieIds.length} movies for vibe: ${vibeText}`)
+      console.warn(`Only found ${movieIds.length} movies matching filters for vibe: ${vibeText}`)
       
-      // Try searching for "popular" as fallback
-      const popularResults = await searchMovies('popular', 1)
+      // Try searching for popular movies as fallback
+      const popularResults = await searchMovies('', 1) // Empty query = discover popular
       const popularIds = popularResults.results
         .map((movie) => movie.id)
         .filter((id) => !isNaN(id) && id > 0 && !movieIds.includes(id))
         .slice(0, 5 - movieIds.length)
       
       movieIds.push(...popularIds)
+      console.log('Filled with popular movies:', popularIds)
     }
+
+    console.log('Final selected movie IDs:', movieIds)
+    console.log('=== END MOVIE SELECTION DEBUG ===\n')
 
     // Ensure we return exactly 5 movies (or as many as possible)
     return movieIds.slice(0, 5)

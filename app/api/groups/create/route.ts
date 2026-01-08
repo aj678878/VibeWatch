@@ -15,7 +15,7 @@ export async function POST() {
     // Generate unique invite code
     const inviteCode = nanoid(8).toLowerCase()
 
-    // Create group
+    // Create group with participant (host)
     const group = await prisma.group.create({
       data: {
         invite_code: inviteCode,
@@ -25,17 +25,34 @@ export async function POST() {
             user_id: user.id,
           },
         },
+        participants: {
+          create: {
+            type: 'member',
+            user_id: user.id,
+            preferred_name: user.email?.split('@')[0] || 'Member',
+            status: 'active',
+          },
+        },
+      },
+      include: {
+        participants: {
+          where: { status: 'active' },
+        },
       },
     })
 
-    return NextResponse.json({ group })
+    return NextResponse.json({ 
+      group: {
+        ...group,
+        invite_link: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/groups/join/${inviteCode}`,
+      }
+    })
   } catch (error: any) {
     console.error('Error creating group:', error)
     return NextResponse.json(
       { 
         error: 'Failed to create group',
         details: error.message || 'Unknown error',
-        code: error.code,
       },
       { status: 500 }
     )

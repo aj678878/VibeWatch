@@ -70,6 +70,9 @@ Return ONLY a JSON object with this structure:
 Be specific and only include constraints you can confidently infer. If uncertain, use null.`
 
   try {
+    console.log('=== GROQ EXTRACT PREFERENCES DEBUG ===')
+    console.log('Input prompt:', prompt)
+    
     const completion = await groq.chat.completions.create({
       messages: [
         {
@@ -88,11 +91,16 @@ Be specific and only include constraints you can confidently infer. If uncertain
     })
 
     const content = completion.choices[0]?.message?.content
+    console.log('Groq response:', content)
+    
     if (!content) {
       throw new Error('No response from Groq')
     }
 
     const constraints = JSON.parse(content) as PreferenceConstraints
+    console.log('Parsed constraints:', JSON.stringify(constraints, null, 2))
+    console.log('=== END GROQ EXTRACT PREFERENCES DEBUG ===\n')
+    
     return constraints
   } catch (error) {
     console.error('Error extracting preferences:', error)
@@ -103,7 +111,7 @@ Be specific and only include constraints you can confidently infer. If uncertain
 
 /**
  * Get a movie recommendation for solo users based on their votes and vibe.
- * Takes all choices (yes/no) and uses them to recommend a new movie.
+ * Takes all choices (yes/no) and uses them to recommend a NEW movie NOT in the list.
  */
 export async function recommendMovieForSoloUser(
   vibeText: string,
@@ -123,6 +131,12 @@ export async function recommendMovieForSoloUser(
 
   const prompt = `You are a movie recommendation assistant helping a single user find the perfect movie.
 
+CRITICAL RESTRICTIONS:
+- Only recommend Hindi (language code: hi) or English (language code: en) movies
+- Only recommend movies released AFTER 2000 (year >= 2001)
+- The recommended movie MUST NOT be one of these already shown: ${shownMovieIds.join(', ')}
+- You must provide a valid TMDB movie ID for a real movie that exists
+
 User's mood/vibe: "${vibeText}"
 
 Movies the user LIKED (voted YES):
@@ -131,13 +145,15 @@ ${yesVotes.length > 0 ? yesVotes.map(v => `- Movie ID: ${v.movie_tmdb_id}`).join
 Movies the user REJECTED (voted NO):
 ${noVotes.map(v => `- Movie ID: ${v.movie_tmdb_id}${v.reason_text ? ` (reason: "${v.reason_text}")` : ''}`).join('\n') || '- None'}
 
-Movies already shown (do not recommend these): ${shownMovieIds.join(', ')}
+Movies already shown (DO NOT recommend these): ${shownMovieIds.join(', ')}
 
 Based on this information, recommend ONE movie that:
 1. Matches the user's stated vibe/mood
 2. Is similar to movies they liked (if any)
 3. Avoids characteristics of movies they rejected
-4. Has NOT been shown before
+4. Has NOT been shown before (not in the list above)
+5. Is Hindi or English only
+6. Was released after 2000
 
 Return ONLY a JSON object:
 {
@@ -146,14 +162,21 @@ Return ONLY a JSON object:
   "reason": "Brief explanation of why this movie fits their preferences"
 }
 
-The tmdb_id MUST be a valid TMDB movie ID for a real movie.`
+The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restrictions above.`
 
   try {
+    console.log('=== GROQ SOLO RECOMMENDATION DEBUG ===')
+    console.log('Input prompt:', prompt)
+    console.log('Votes summary:')
+    console.log('  - YES votes:', yesVotes.length)
+    console.log('  - NO votes:', noVotes.length)
+    console.log('  - Shown movie IDs:', shownMovieIds)
+    
     const completion = await groq.chat.completions.create({
       messages: [
         {
           role: 'system',
-          content: 'You are a movie recommendation expert. You have extensive knowledge of movies and their TMDB IDs. Recommend movies that match user preferences. Return only valid JSON.',
+          content: 'You are a movie recommendation expert. You have extensive knowledge of movies and their TMDB IDs. Recommend movies that match user preferences. IMPORTANT: Only recommend Hindi or English movies released after 2000. Return only valid JSON.',
         },
         {
           role: 'user',
@@ -166,6 +189,8 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie.`
     })
 
     const content = completion.choices[0]?.message?.content
+    console.log('Groq raw response:', content)
+    
     if (!content) {
       throw new Error('No response from Groq')
     }
@@ -175,6 +200,9 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie.`
       title: string
       reason: string
     }
+    
+    console.log('Parsed recommendation:', JSON.stringify(result, null, 2))
+    console.log('=== END GROQ SOLO RECOMMENDATION DEBUG ===\n')
 
     return result
   } catch (error) {
@@ -209,6 +237,11 @@ export async function recommendMovies(
 
   const prompt = `You are helping a group of friends choose a movie. They've gone through 5 voting rounds without consensus.
 
+CRITICAL RESTRICTIONS:
+- Only recommend Hindi (language code: hi) or English (language code: en) movies
+- Only recommend movies released AFTER 2000 (year >= 2001)
+- You can recommend movies NOT in the watchlist if they better match preferences
+
 Initial vibe: "${vibeText}"
 
 Voting patterns:
@@ -217,7 +250,6 @@ Voting patterns:
 ${noVotes.some((v) => v.reason_text) ? `- NO vote reasons: ${noVotes.filter((v) => v.reason_text).map((v) => `"${v.reason_text}"`).join(', ')}` : ''}
 
 Movies already shown in rounds: ${Array.from(shownMovies).join(', ')}
-
 Available watchlist movies: ${watchlistTmdbIds.join(', ')}
 
 Recommend 1 top pick and 2 alternates. You can recommend:
@@ -239,15 +271,18 @@ Return ONLY a JSON object:
   "explanation": "Overall explanation of why these recommendations are fair and match the group's preferences"
 }
 
-Be fair, consider all preferences, and avoid movies that were strongly rejected.`
+Be fair, consider all preferences, and avoid movies that were strongly rejected. All movies must be Hindi or English, released after 2000.`
 
   try {
+    console.log('=== GROQ FINAL RESOLUTION DEBUG ===')
+    console.log('Input prompt:', prompt)
+    
     const completion = await groq.chat.completions.create({
       messages: [
         {
           role: 'system',
           content:
-            'You are a fair movie recommendation assistant. Recommend movies that minimize objections while respecting group preferences. Return only valid JSON with tmdb_id, title, reason, and explanation fields.',
+            'You are a fair movie recommendation assistant. Recommend movies that minimize objections while respecting group preferences. IMPORTANT: Only recommend Hindi or English movies released after 2000. Return only valid JSON with tmdb_id, title, reason, and explanation fields.',
         },
         {
           role: 'user',
@@ -260,6 +295,8 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
     })
 
     const content = completion.choices[0]?.message?.content
+    console.log('Groq raw response:', content)
+    
     if (!content) {
       throw new Error('No response from Groq')
     }
@@ -269,6 +306,9 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
       alternates: MovieRecommendation[]
       explanation: string
     }
+    
+    console.log('Parsed recommendation:', JSON.stringify(result, null, 2))
+    console.log('=== END GROQ FINAL RESOLUTION DEBUG ===\n')
 
     return result
   } catch (error) {

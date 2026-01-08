@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { getCurrentParticipant } from '@/lib/participant'
 import VotingRoundClient from './VotingRoundClient'
 
 export default async function VotingRoundPage({
@@ -8,14 +9,13 @@ export default async function VotingRoundPage({
 }: {
   params: { groupId: string; sessionId: string; roundNumber: string }
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
   const roundNumber = parseInt(params.roundNumber)
+
+  // Get current participant (member or guest)
+  const currentParticipant = await getCurrentParticipant(params.groupId)
+  if (!currentParticipant) {
+    redirect('/groups')
+  }
 
   // Get session and verify access
   const session = await prisma.decisionSession.findUnique({
@@ -23,7 +23,9 @@ export default async function VotingRoundPage({
     include: {
       group: {
         include: {
-          members: true,
+          participants: {
+            where: { status: 'active' },
+          },
         },
       },
     },
@@ -33,12 +35,12 @@ export default async function VotingRoundPage({
     redirect(`/groups/${params.groupId}/watchlist`)
   }
 
-  // Verify user is a member
-  const isMember = session.group.members.some(
-    (member) => member.user_id === user.id
+  // Verify participant is in the group
+  const isParticipant = session.group.participants.some(
+    (p) => p.id === currentParticipant.id
   )
 
-  if (!isMember) {
+  if (!isParticipant) {
     redirect('/groups')
   }
 
@@ -53,7 +55,7 @@ export default async function VotingRoundPage({
     include: {
       votes: {
         where: {
-          user_id: user.id,
+          participant_id: currentParticipant.id,
         },
       },
     },

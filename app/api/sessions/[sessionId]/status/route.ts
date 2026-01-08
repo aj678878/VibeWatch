@@ -1,19 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { getCurrentParticipant } from '@/lib/participant'
 
 export async function GET(
   request: Request,
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const { sessionId } = params
 
     const session = await prisma.decisionSession.findUnique({
@@ -21,16 +15,14 @@ export async function GET(
       include: {
         group: {
           include: {
-            members: true,
+            participants: {
+              where: { status: 'active' },
+            },
           },
         },
         rounds: {
           include: {
-            votes: {
-              where: {
-                user_id: user.id,
-              },
-            },
+            votes: true,
           },
           orderBy: {
             round_number: 'asc',
@@ -43,14 +35,11 @@ export async function GET(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
-    // Verify user is a member
-    const isMember = session.group.members.some(
-      (member) => member.user_id === user.id
-    )
-
-    if (!isMember) {
+    // Get current participant
+    const currentParticipant = await getCurrentParticipant(session.group_id)
+    if (!currentParticipant) {
       return NextResponse.json(
-        { error: 'Not a member of this group' },
+        { error: 'Not a participant in this group' },
         { status: 403 }
       )
     }
@@ -64,30 +53,41 @@ export async function GET(
       return NextResponse.json({ error: 'Round not found' }, { status: 404 })
     }
 
-    // Check if user has voted on all movies in current round
     const movieIds = currentRound.movie_tmdb_ids as number[]
-    const userVotes = currentRound.votes
-    const hasVotedOnAll = movieIds.every((tmdbId) =>
-      userVotes.some((vote) => vote.movie_tmdb_id === tmdbId)
+    const allVotesInRound = currentRound.votes
+
+    // Get current participant's votes
+    const currentParticipantVotes = allVotesInRound.filter(
+      (v) => v.participant_id === currentParticipant.id
     )
 
-    // Check how many members have voted on all movies in this round
-    const memberIds = session.group.members.map((m) => m.user_id)
-    const allVotesInRound = await prisma.vote.findMany({
-      where: { round_id: currentRound.id },
+    const hasVotedOnAll = movieIds.every((tmdbId) =>
+      currentParticipantVotes.some((vote) => vote.movie_tmdb_id === tmdbId)
+    )
+
+    // Get participant completion status (for status dots)
+    const activeParticipants = session.group.participants
+    const participantsStatus = activeParticipants.map((p) => {
+      const participantVotes = allVotesInRound.filter(
+        (v) => v.participant_id === p.id
+      )
+      const hasCompleted = movieIds.every((tmdbId) =>
+        participantVotes.some((vote) => vote.movie_tmdb_id === tmdbId)
+      )
+
+      return {
+        id: p.id,
+        type: p.type,
+        displayName: p.preferred_name || (p.type === 'member' ? 'Member' : 'Guest'),
+        hasCompleted,
+      }
     })
 
-    // Count members who have voted on all movies
-    const membersVotedCount = memberIds.filter((memberId) =>
-      movieIds.every((tmdbId) =>
-        allVotesInRound.some(
-          (vote) => vote.user_id === memberId && vote.movie_tmdb_id === tmdbId
-        )
-      )
-    ).length
-
-    const totalMembers = memberIds.length
-    const waitingCount = totalMembers - membersVotedCount
+    // Count participants who have completed
+    const completedCount = participantsStatus.filter((p) => p.hasCompleted).length
+    const totalParticipants = activeParticipants.length
+    const waitingCount = totalParticipants - completedCount
+    const isRoundComplete = waitingCount === 0
 
     return NextResponse.json({
       session: {
@@ -101,18 +101,18 @@ export async function GET(
         round_number: currentRound.round_number,
         movie_tmdb_ids: movieIds,
       },
-      userVotes: userVotes.map((v) => ({
+      userVotes: currentParticipantVotes.map((v) => ({
         movie_tmdb_id: v.movie_tmdb_id,
         vote: v.vote,
         reason_text: v.reason_text,
       })),
       hasVotedOnAll,
-      // Async session info (do not reveal vote counts or identities)
+      participantsStatus, // For showing green/red dots
       roundStatus: {
-        membersVoted: membersVotedCount,
-        totalMembers: totalMembers,
-        waitingForMembers: waitingCount,
-        isComplete: waitingCount === 0,
+        participantsCompleted: completedCount,
+        totalParticipants,
+        waitingForParticipants: waitingCount,
+        isComplete: isRoundComplete,
       },
     })
   } catch (error) {

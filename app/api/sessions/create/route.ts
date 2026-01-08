@@ -21,19 +21,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify user is a member of the group
-    const member = await prisma.groupMember.findUnique({
+    // Verify user is a participant in the group
+    const participant = await prisma.groupParticipant.findFirst({
       where: {
-        user_id_group_id: {
-          user_id: user.id,
-          group_id: groupId,
-        },
+        group_id: groupId,
+        user_id: user.id,
+        type: 'member',
+        status: 'active',
       },
     })
 
-    if (!member) {
+    if (!participant) {
       return NextResponse.json(
-        { error: 'Not a member of this group' },
+        { error: 'Not a participant in this group' },
         { status: 403 }
       )
     }
@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
         vibe_text: vibeText,
         status: 'active',
         current_round: 1,
+        created_by_user_id: user.id,
         rounds: {
           create: {
             round_number: 1,

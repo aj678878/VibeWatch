@@ -20,6 +20,7 @@ model Group {
   created_at        DateTime @default(now())
 
   members           GroupMember[]
+  participants      GroupParticipant[]
   watchlists        GroupWatchlist[]
   sessions          DecisionSession[]
 
@@ -27,6 +28,8 @@ model Group {
   @@index([created_by_user_id])
 }
 
+// Legacy table - kept for backward compatibility
+// New participants should use GroupParticipant
 model GroupMember {
   id        String   @id @default(uuid())
   user_id   String   // Supabase Auth UUID
@@ -38,6 +41,25 @@ model GroupMember {
   @@unique([user_id, group_id])
   @@index([user_id])
   @@index([group_id])
+}
+
+// New unified participant model supporting both members and guests
+model GroupParticipant {
+  id             String   @id @default(uuid())
+  group_id       String
+  type           String   // 'member' | 'guest'
+  user_id        String?  // Supabase Auth UUID (nullable for guests)
+  preferred_name String?  // Required for guests, optional for members
+  status         String   @default("active") // 'active' | 'removed'
+  created_at     DateTime @default(now())
+
+  group Group @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  votes Vote[]
+
+  @@index([group_id])
+  @@index([user_id])
+  @@index([status])
+  @@index([type])
 }
 
 model GroupWatchlist {
@@ -56,9 +78,12 @@ model DecisionSession {
   id                 String   @id @default(uuid())
   group_id           String
   vibe_text          String
-  status             String   @default("active") // active, completed
-  current_round      Int      @default(1)
+  status             String   @default("active") // 'active' | 'completed'
+  current_round       Int      @default(1)
   final_movie_tmdb_id Int?    // Set when consensus or AI resolution
+  created_by_user_id  String   // User who started the session
+  picked_by          String?  // 'consensus' | 'ai' (for debugging only, not exposed in UI)
+  alternates_json    Json?    // Array of alternate movie recommendations
   created_at         DateTime @default(now())
 
   group  Group         @relation(fields: [group_id], references: [id], onDelete: Cascade)
@@ -72,7 +97,7 @@ model VotingRound {
   id             String   @id @default(uuid())
   session_id     String
   round_number   Int
-  movie_tmdb_ids Json     // Array of TMDB IDs [123, 456, ...]
+  movie_tmdb_ids Json     // Array of exactly 5 TMDB IDs [123, 456, ...]
 
   session DecisionSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
   votes   Vote[]
@@ -82,16 +107,17 @@ model VotingRound {
 }
 
 model Vote {
-  id            String   @id @default(uuid())
-  round_id      String
-  user_id       String   // Supabase Auth UUID
-  movie_tmdb_id Int
-  vote          String   // "yes" or "no"
-  reason_text   String?  // Optional rejection reason
+  id             String   @id @default(uuid())
+  round_id       String
+  participant_id String   // References GroupParticipant (not user_id directly)
+  movie_tmdb_id  Int
+  vote           String   // "yes" or "no"
+  reason_text    String?  // Optional rejection reason
 
-  round VotingRound @relation(fields: [round_id], references: [id], onDelete: Cascade)
+  round       VotingRound      @relation(fields: [round_id], references: [id], onDelete: Cascade)
+  participant GroupParticipant @relation(fields: [participant_id], references: [id], onDelete: Cascade)
 
-  @@unique([round_id, user_id, movie_tmdb_id])
+  @@unique([round_id, participant_id, movie_tmdb_id])
   @@index([round_id])
-  @@index([user_id])
+  @@index([participant_id])
 }

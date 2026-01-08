@@ -7,15 +7,18 @@ import MovieSearch from '@/components/MovieSearch'
 import Watchlist from '@/components/Watchlist'
 import LogoutButton from '@/components/LogoutButton'
 
-interface GroupMember {
+interface Participant {
   id: string
-  user_id: string
+  type: 'member' | 'guest'
+  displayName: string
+  hasCompleted?: boolean
 }
 
 interface Group {
   id: string
   invite_code: string
-  members: GroupMember[]
+  created_by_user_id: string
+  participants: Participant[]
 }
 
 interface WatchlistItem {
@@ -33,12 +36,14 @@ interface WatchlistClientProps {
   group: Group
   watchlist: WatchlistItem[]
   activeSession: DecisionSession | null
+  isHost: boolean
 }
 
 export default function WatchlistClient({
   group,
   watchlist: initialWatchlist,
   activeSession,
+  isHost,
 }: WatchlistClientProps) {
   const router = useRouter()
   const [watchlist, setWatchlist] = useState(initialWatchlist)
@@ -73,9 +78,31 @@ export default function WatchlistClient({
     router.push(`/groups/${group.id}/sessions/new`)
   }
 
-  const handleContinueSession = () => {
+  const handleEnterSession = () => {
     if (activeSession) {
       router.push(`/groups/${group.id}/sessions/${activeSession.id}/round/${activeSession.current_round}`)
+    }
+  }
+
+  const handleRemoveGuest = async (participantId: string) => {
+    if (!confirm('Remove this guest from the group?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/groups/${group.id}/guests/${participantId}/remove`, {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        // Reload page to refresh participant list
+        window.location.reload()
+      } else {
+        alert('Failed to remove guest')
+      }
+    } catch (error) {
+      console.error('Error removing guest:', error)
+      alert('Failed to remove guest')
     }
   }
 
@@ -116,30 +143,73 @@ export default function WatchlistClient({
                 >
                   {copied ? 'Copied' : 'Copy invite link'}
                 </button>
-                <span className="text-netflix-gray">
-                  {group.members.length} {group.members.length === 1 ? 'member' : 'members'}
-                </span>
               </div>
             </div>
 
             <div className="flex gap-3">
               {activeSession ? (
                 <button
-                  onClick={handleContinueSession}
+                  onClick={handleEnterSession}
                   className="netflix-btn px-6 py-3"
                 >
-                  Continue Session - Round {activeSession.current_round}
+                  Enter Decision Session
                 </button>
               ) : (
                 <button
                   onClick={handleStartDecision}
                   className="netflix-btn px-6 py-3"
                 >
-                  Start Decision
+                  Start Decision Session
                 </button>
               )}
             </div>
           </div>
+
+          {/* Participants list */}
+          <section className="mb-8">
+            <h3 className="text-xl font-medium mb-4">
+              Participants <span className="text-netflix-gray font-normal">({group.participants.length})</span>
+            </h3>
+            <div className="bg-card-bg rounded p-4 space-y-2">
+              {group.participants.map((participant) => (
+                <div
+                  key={participant.id}
+                  className="flex items-center justify-between py-2 px-3 hover:bg-card-hover rounded transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Status dot */}
+                    {activeSession && (
+                      <div
+                        className={`w-3 h-3 rounded-full ${
+                          participant.hasCompleted ? 'bg-green-500' : 'bg-red-500'
+                        }`}
+                        title={
+                          participant.hasCompleted
+                            ? 'Completed voting for this round'
+                            : 'Has not completed voting for this round'
+                        }
+                      />
+                    )}
+                    <span className="font-medium">{participant.displayName}</span>
+                    {participant.type === 'guest' && (
+                      <span className="text-xs text-netflix-gray bg-netflix-gray/20 px-2 py-0.5 rounded">
+                        Guest
+                      </span>
+                    )}
+                  </div>
+                  {isHost && participant.type === 'guest' && (
+                    <button
+                      onClick={() => handleRemoveGuest(participant.id)}
+                      className="text-netflix-red hover:text-netflix-red-hover text-xl font-bold w-6 h-6 flex items-center justify-center"
+                      title="Remove guest"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
 
           {/* Search section */}
           <section className="mb-12">

@@ -21,18 +21,18 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid movie ID' }, { status: 400 })
     }
 
-    // Verify user is a member of the group
-    const member = await prisma.groupMember.findUnique({
+    // Verify user is a participant in the group
+    const participant = await prisma.groupParticipant.findFirst({
       where: {
-        user_id_group_id: {
-          user_id: user.id,
-          group_id: groupId,
-        },
+        group_id: groupId,
+        user_id: user.id,
+        type: 'member',
+        status: 'active',
       },
     })
 
-    if (!member) {
-      return NextResponse.json({ error: 'Not a member of this group' }, { status: 403 })
+    if (!participant) {
+      return NextResponse.json({ error: 'Not a participant in this group' }, { status: 403 })
     }
 
     // Check if already in watchlist
@@ -86,18 +86,18 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid movie ID' }, { status: 400 })
     }
 
-    // Verify user is a member of the group
-    const member = await prisma.groupMember.findUnique({
+    // Verify user is a participant in the group
+    const participant = await prisma.groupParticipant.findFirst({
       where: {
-        user_id_group_id: {
-          user_id: user.id,
-          group_id: groupId,
-        },
+        group_id: groupId,
+        user_id: user.id,
+        type: 'member',
+        status: 'active',
       },
     })
 
-    if (!member) {
-      return NextResponse.json({ error: 'Not a member of this group' }, { status: 403 })
+    if (!participant) {
+      return NextResponse.json({ error: 'Not a participant in this group' }, { status: 403 })
     }
 
     // Remove from watchlist

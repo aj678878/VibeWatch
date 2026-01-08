@@ -38,11 +38,17 @@ export default function VotingRoundClient({
   const [roundId, setRoundId] = useState<string | null>(null)
   const [sessionStatus, setSessionStatus] = useState<string>('active')
   const [roundStatus, setRoundStatus] = useState<{
-    membersVoted: number
-    totalMembers: number
-    waitingForMembers: number
+    participantsCompleted: number
+    totalParticipants: number
+    waitingForParticipants: number
     isComplete: boolean
   } | null>(null)
+  const [participantsStatus, setParticipantsStatus] = useState<Array<{
+    id: string
+    type: 'member' | 'guest'
+    displayName: string
+    hasCompleted: boolean
+  }>>([])
 
   // Poll for session status
   useEffect(() => {
@@ -56,6 +62,10 @@ export default function VotingRoundClient({
 
           if (data.roundStatus) {
             setRoundStatus(data.roundStatus)
+          }
+
+          if (data.participantsStatus) {
+            setParticipantsStatus(data.participantsStatus)
           }
 
           const votesMap: Record<number, UserVote> = {}
@@ -170,11 +180,38 @@ export default function VotingRoundClient({
             </div>
           </div>
 
+          {/* Participants status */}
+          {participantsStatus.length > 0 && (
+            <div className="bg-card-bg rounded p-4 mb-8">
+              <h3 className="text-sm font-medium mb-3">Participants</h3>
+              <div className="space-y-2">
+                {participantsStatus.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          p.hasCompleted ? 'bg-green-500' : 'bg-red-500'
+                        }`}
+                      />
+                      <span>{p.displayName}</span>
+                      {p.type === 'guest' && (
+                        <span className="text-xs text-netflix-gray">Guest</span>
+                      )}
+                    </div>
+                    <span className="text-netflix-gray">
+                      {p.hasCompleted ? 'Done' : 'Voting...'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Status messages */}
           {allVoted && roundStatus && !roundStatus.isComplete && (
             <div className="bg-card-bg rounded p-4 mb-8 text-center">
               <p className="text-netflix-gray">
-                You have voted on all movies. Waiting for {roundStatus.waitingForMembers} other {roundStatus.waitingForMembers === 1 ? 'member' : 'members'}...
+                You have voted on all movies. Waiting for {roundStatus.waitingForParticipants} other {roundStatus.waitingForParticipants === 1 ? 'participant' : 'participants'}...
               </p>
             </div>
           )}
@@ -182,7 +219,7 @@ export default function VotingRoundClient({
           {roundStatus && roundStatus.isComplete && (
             <div className="bg-green-500/20 rounded p-4 mb-8 text-center">
               <p className="text-green-400">
-                All members have voted. Processing results...
+                All participants have voted. Processing results...
               </p>
             </div>
           )}
