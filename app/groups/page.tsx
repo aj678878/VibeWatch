@@ -96,7 +96,7 @@ export default async function GroupsPage() {
                     Watch Group
                   </h3>
                   <div className="flex gap-4 text-sm text-netflix-gray">
-                    <span>{group.members.length} members</span>
+                    <span>{group.participants.length} members</span>
                     <span>{group._count.watchlists} movies</span>
                   </div>
                 </Link>

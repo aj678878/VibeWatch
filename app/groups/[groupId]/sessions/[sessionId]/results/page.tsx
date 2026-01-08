@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { getCurrentParticipant } from '@/lib/participant'
 import ResultsClient from './ResultsClient'
 
 export default async function ResultsPage({
@@ -11,9 +12,8 @@ export default async function ResultsPage({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/login')
-  }
+  const currentParticipant = await getCurrentParticipant(params.groupId)
+  if (!user && !currentParticipant) redirect('/login')
 
   // Get session
   const session = await prisma.decisionSession.findUnique({
@@ -21,7 +21,9 @@ export default async function ResultsPage({
     include: {
       group: {
         include: {
-          members: true,
+          participants: {
+            where: { status: 'active' },
+          },
         },
       },
     },
@@ -31,14 +33,12 @@ export default async function ResultsPage({
     redirect(`/groups/${params.groupId}/watchlist`)
   }
 
-  // Verify user is a member
-  const isMember = session.group.members.some(
-    (member) => member.user_id === user.id
+  // Verify requester is an active participant in this group
+  if (!currentParticipant) redirect('/groups')
+  const isActiveParticipant = session.group.participants.some(
+    (p) => p.id === currentParticipant.participantId
   )
-
-  if (!isMember) {
-    redirect('/groups')
-  }
+  if (!isActiveParticipant) redirect('/groups')
 
   // If session is not completed, check if we need to trigger final resolution
   if (session.status === 'active' && session.current_round >= 5) {
@@ -56,12 +56,12 @@ export default async function ResultsPage({
     })
 
     if (round5) {
-      const memberIds = session.group.members.map((m) => user.id)
+      const activeParticipantIds = session.group.participants.map((p) => p.id)
       const movieIds = round5.movie_tmdb_ids as number[]
-      const allVoted = memberIds.every((memberId) =>
+      const allVoted = activeParticipantIds.every((participantId) =>
         movieIds.every((tmdbId) =>
           round5.votes.some(
-            (v) => v.user_id === memberId && v.movie_tmdb_id === tmdbId
+            (v) => v.participant_id === participantId && v.movie_tmdb_id === tmdbId
           )
         )
       )
