@@ -28,7 +28,10 @@ export async function getCurrentParticipant(groupId: string): Promise<{
     })
 
     if (memberParticipant) {
-      return memberParticipant
+      return {
+        ...memberParticipant,
+        type: memberParticipant.type as 'member' | 'guest', // Type assertion for literal union
+      }
     }
   }
 
@@ -45,7 +48,10 @@ export async function getCurrentParticipant(groupId: string): Promise<{
     })
 
     if (guestParticipant) {
-      return guestParticipant
+      return {
+        ...guestParticipant,
+        type: guestParticipant.type as 'member' | 'guest', // Type assertion for literal union
+      }
     }
   }
 
