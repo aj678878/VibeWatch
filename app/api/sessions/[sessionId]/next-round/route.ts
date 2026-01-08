@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { getCurrentParticipant } from '@/lib/participant'
 import { selectNextRoundMovies } from '@/lib/ai/movie-selector'
 import { recommendMovies, recommendMovieForSoloUser } from '@/lib/groq'
 
@@ -23,13 +24,19 @@ export async function POST(
       include: {
         group: {
           include: {
-            members: true,
+            participants: {
+              where: { status: 'active' },
+            },
             watchlists: true,
           },
         },
         rounds: {
           include: {
-            votes: true,
+            votes: {
+              include: {
+                participant: true,
+              },
+            },
           },
           orderBy: {
             round_number: 'desc',
@@ -42,14 +49,11 @@ export async function POST(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
-    // Verify user is a member
-    const isMember = session.group.members.some(
-      (member) => member.user_id === user.id
-    )
-
-    if (!isMember) {
+    // Verify user is a participant
+    const currentParticipant = await getCurrentParticipant(session.group_id)
+    if (!currentParticipant) {
       return NextResponse.json(
-        { error: 'Not a member of this group' },
+        { error: 'Not a participant in this group' },
         { status: 403 }
       )
     }
@@ -67,29 +71,29 @@ export async function POST(
       return NextResponse.json({ error: 'Round not found' }, { status: 404 })
     }
 
-    // Check if all members have voted on all movies
-    const memberIds = session.group.members.map((m) => m.user_id)
+    // Check if all active participants have voted on all movies
+    const activeParticipantIds = session.group.participants.map((p) => p.id)
     const movieIds = currentRound.movie_tmdb_ids as number[]
     const allVotes = currentRound.votes
-    const totalMembers = memberIds.length
+    const totalParticipants = activeParticipantIds.length
 
-    const allMembersVoted = memberIds.every((memberId) =>
+    const allParticipantsVoted = activeParticipantIds.every((participantId) =>
       movieIds.every((tmdbId) =>
         allVotes.some(
-          (vote) => vote.user_id === memberId && vote.movie_tmdb_id === tmdbId
+          (vote) => vote.participant_id === participantId && vote.movie_tmdb_id === tmdbId
         )
       )
     )
 
-    if (!allMembersVoted) {
+    if (!allParticipantsVoted) {
       return NextResponse.json(
-        { error: 'Not all members have voted' },
+        { error: 'Not all participants have voted' },
         { status: 400 }
       )
     }
 
     // SOLO MODE: Always use Groq to recommend based on all votes
-    if (totalMembers === 1) {
+    if (totalParticipants === 1) {
       try {
         // Collect all votes from current round
         const currentRoundVotes = currentRound.votes.map((v) => ({
@@ -167,7 +171,7 @@ export async function POST(
     }
 
     // MULTI-USER MODE: Check for consensus
-    const requiredYesVotes = Math.ceil(totalMembers / 2) + (totalMembers % 2 === 0 ? 1 : 0)
+    const requiredYesVotes = totalParticipants === 1 ? 1 : 2 // 1 for solo, >=2 for 3-person groups
     
     const yesVotesByMovie: Record<number, number> = {}
     movieIds.forEach((tmdbId) => {

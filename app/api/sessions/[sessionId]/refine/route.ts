@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { getCurrentParticipant } from '@/lib/participant'
 import { selectNextRoundMovies } from '@/lib/ai/movie-selector'
 
 export async function POST(
@@ -22,7 +23,9 @@ export async function POST(
       include: {
         group: {
           include: {
-            members: true,
+            participants: {
+              where: { status: 'active' },
+            },
             watchlists: true,
           },
         },
@@ -41,14 +44,11 @@ export async function POST(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
-    // Verify user is a member
-    const isMember = session.group.members.some(
-      (member) => member.user_id === user.id
-    )
-
-    if (!isMember) {
+    // Verify user is a participant
+    const currentParticipant = await getCurrentParticipant(session.group_id)
+    if (!currentParticipant) {
       return NextResponse.json(
-        { error: 'Not a member of this group' },
+        { error: 'Not a participant in this group' },
         { status: 403 }
       )
     }
