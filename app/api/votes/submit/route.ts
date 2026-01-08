@@ -103,16 +103,6 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Check if session is already completed (idempotency check)
-    if (round.session.status === 'completed') {
-      return NextResponse.json({
-        success: true,
-        roundComplete: true,
-        sessionCompleted: true,
-        finalMovieTmdbId: round.session.final_movie_tmdb_id,
-      })
-    }
-
     // Check if round is complete (all active participants have voted on all 5 movies)
     const activeParticipants = round.session.group.participants
     const roundVotes = await prisma.vote.findMany({
