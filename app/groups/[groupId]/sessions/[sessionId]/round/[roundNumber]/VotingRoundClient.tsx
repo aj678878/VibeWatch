@@ -37,6 +37,8 @@ export default function VotingRoundClient({
   const [loading, setLoading] = useState(false)
   const [roundId, setRoundId] = useState<string | null>(null)
   const [sessionStatus, setSessionStatus] = useState<string>('active')
+  const [currentRoundNumber, setCurrentRoundNumber] = useState<number>(roundNumber)
+  const [currentMovieIds, setCurrentMovieIds] = useState<number[]>(movieTmdbIds)
   const [roundStatus, setRoundStatus] = useState<{
     participantsCompleted: number
     totalParticipants: number
@@ -52,6 +54,8 @@ export default function VotingRoundClient({
 
   // Poll for session status
   useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+
     const pollStatus = async () => {
       try {
         const response = await fetch(`/api/sessions/${sessionId}/status`)
@@ -59,6 +63,8 @@ export default function VotingRoundClient({
           const data = await response.json()
           setSessionStatus(data.session.status)
           setRoundId(data.currentRound.id)
+          setCurrentRoundNumber(data.session.current_round)
+          setCurrentMovieIds(data.currentRound.movie_tmdb_ids || [])
 
           if (data.roundStatus) {
             setRoundStatus(data.roundStatus)
@@ -74,20 +80,32 @@ export default function VotingRoundClient({
           })
           setUserVotes(votesMap)
 
+          // If session is completed, redirect to results
           if (data.session.status === 'completed') {
+            if (interval) clearInterval(interval)
             router.push(`/groups/${groupId}/sessions/${sessionId}/results`)
             return
           }
 
+          // If we've moved to a new round, redirect to that round
           if (data.session.current_round > roundNumber) {
+            if (interval) clearInterval(interval)
             router.push(
               `/groups/${groupId}/sessions/${sessionId}/round/${data.session.current_round}`
             )
             return
           }
 
-          // Don't call next-round - vote submission route handles round completion
-          // Just wait for status to change to 'completed' via polling
+          // If round is complete, poll more frequently (every 1.5 seconds) to catch
+          // when server finishes processing (creates next round or completes session)
+          if (data.roundStatus?.isComplete) {
+            if (interval) {
+              clearInterval(interval)
+            }
+            // Poll faster when waiting for server to process
+            interval = setInterval(pollStatus, 1500)
+            return
+          }
         }
       } catch (error) {
         console.error('Error polling status:', error)
@@ -95,8 +113,11 @@ export default function VotingRoundClient({
     }
 
     pollStatus()
-    const interval = setInterval(pollStatus, 3000)
-    return () => clearInterval(interval)
+    interval = setInterval(pollStatus, 3000)
+    
+    return () => {
+      if (interval) clearInterval(interval)
+    }
   }, [sessionId, roundNumber, groupId, router])
 
   const handleVote = async (
@@ -141,8 +162,8 @@ export default function VotingRoundClient({
     }
   }
 
-  const allVoted = movieTmdbIds.every((id) => userVotes[id])
-  const votedCount = Object.keys(userVotes).length
+  const allVoted = currentMovieIds.every((id) => userVotes[id])
+  const votedCount = currentMovieIds.filter((id) => userVotes[id]).length
 
   return (
     <div className="min-h-screen bg-netflix-dark">
@@ -153,7 +174,7 @@ export default function VotingRoundClient({
             <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
           </Link>
           <div className="text-sm text-netflix-gray">
-            Round {roundNumber} of 5
+            Round {currentRoundNumber} of 5
           </div>
         </div>
       </header>
@@ -166,13 +187,13 @@ export default function VotingRoundClient({
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-medium">Vote on Movies</h2>
               <span className="text-netflix-gray">
-                {votedCount} of {movieTmdbIds.length} voted
+                {votedCount} of {currentMovieIds.length} voted
               </span>
             </div>
             <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-netflix-red transition-all duration-300"
-                style={{ width: `${(votedCount / movieTmdbIds.length) * 100}%` }}
+                style={{ width: `${currentMovieIds.length > 0 ? (votedCount / currentMovieIds.length) * 100 : 0}%` }}
               />
             </div>
           </div>
@@ -223,7 +244,7 @@ export default function VotingRoundClient({
 
           {/* Movie grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {movieTmdbIds.map((tmdbId) => (
+            {currentMovieIds.map((tmdbId) => (
               <MovieCard
                 key={tmdbId}
                 tmdbId={tmdbId}
