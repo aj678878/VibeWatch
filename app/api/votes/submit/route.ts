@@ -195,13 +195,15 @@ export async function POST(request: NextRequest) {
     // SOLO MODE: If only 1 participant, use Groq to recommend a NEW movie
     const totalParticipants = activeParticipants.length
     if (totalParticipants === 1) {
+      // Define currentRoundVotes outside try block so it's available in catch
+      const currentRoundVotes = roundVotes.map((v) => ({
+        movie_tmdb_id: v.movie_tmdb_id,
+        vote: v.vote as 'yes' | 'no',
+        reason_text: v.reason_text,
+      }))
+      
       try {
         console.log('=== SOLO MODE: Round complete, calling Groq ===')
-        const currentRoundVotes = roundVotes.map((v) => ({
-          movie_tmdb_id: v.movie_tmdb_id,
-          vote: v.vote as 'yes' | 'no',
-          reason_text: v.reason_text,
-        }))
 
         // Get all shown movie IDs to avoid recommending them
         const allRounds = await prisma.votingRound.findMany({
