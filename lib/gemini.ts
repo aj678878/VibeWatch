@@ -86,7 +86,14 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restri
     console.log('  - NO votes:', noVotes.length)
     console.log('  - Shown movie IDs:', shownMovieIds)
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+    // Use latest Gemini model: gemini-3-flash-preview (latest as of Jan 2026)
+    // If this model isn't available, the error will be caught and fallback provider will be used
+    const modelName = 'gemini-3-flash-preview' // Latest fast model
+    // Alternative models if above doesn't work:
+    // - 'gemini-3-pro' (more capable but slower)
+    // - 'gemini-pro' (older but widely available)
+    const model = genAI.getGenerativeModel({ model: modelName })
+    console.log(`Using Gemini model: ${modelName}`)
 
     const result = await model.generateContent(prompt)
     const response = await result.response
@@ -215,7 +222,14 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
     console.log('=== GEMINI FINAL RESOLUTION DEBUG ===')
     console.log('Input prompt:', prompt)
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+    // Use latest Gemini model: gemini-3-flash-preview (latest as of Jan 2026)
+    // If this model isn't available, the error will be caught and fallback provider will be used
+    const modelName = 'gemini-3-flash-preview' // Latest fast model
+    // Alternative models if above doesn't work:
+    // - 'gemini-3-pro' (more capable but slower)
+    // - 'gemini-pro' (older but widely available)
+    const model = genAI.getGenerativeModel({ model: modelName })
+    console.log(`Using Gemini model: ${modelName}`)
 
     const result = await model.generateContent(prompt)
     const response = await result.response

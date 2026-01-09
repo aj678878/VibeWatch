@@ -14,7 +14,8 @@ This app supports multiple AI providers for movie recommendations. You can easil
 - **Free Tier**: Yes, 60 requests/minute free
 - **Speed**: Fast
 - **Setup**: Get API key from https://aistudio.google.com/app/apikey
-- **Model**: `gemini-pro` (standard model, widely available)
+- **Model**: `gemini-3-flash-preview` (latest as of Jan 2026, fastest)
+- **Alternatives**: `gemini-3-pro` (more capable), `gemini-pro` (fallback)
 
 ### 3. **Fallback** (No AI)
 - **Use Case**: When all AI providers fail
