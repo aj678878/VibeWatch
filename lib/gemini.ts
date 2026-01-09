@@ -86,7 +86,7 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restri
     console.log('  - NO votes:', noVotes.length)
     console.log('  - Shown movie IDs:', shownMovieIds)
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
 
     const result = await model.generateContent(prompt)
     const response = await result.response
@@ -215,7 +215,7 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
     console.log('=== GEMINI FINAL RESOLUTION DEBUG ===')
     console.log('Input prompt:', prompt)
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
 
     const result = await model.generateContent(prompt)
     const response = await result.response
