@@ -53,31 +53,31 @@ export default function NewSessionPage() {
   return (
     <div className="min-h-screen bg-netflix-dark">
       {/* Header */}
-      <header className="px-8 py-4">
+      <header className="px-4 sm:px-6 md:px-8 py-3 sm:py-4">
         <Link href="/groups">
-          <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
+          <h1 className="text-netflix-red text-xl sm:text-2xl font-bold tracking-tight">VIBEWATCH</h1>
         </Link>
       </header>
 
-      <main className="flex items-center justify-center px-4 pt-12">
-        <div className="w-full max-w-2xl bg-card-bg rounded p-12 animate-fade-in">
+      <main className="flex items-center justify-center px-4 sm:px-6 pt-8 sm:pt-12 pb-8">
+        <div className="w-full max-w-2xl bg-card-bg rounded p-6 sm:p-8 md:p-12 animate-fade-in">
           <Link
             href={`/groups/${groupId}/watchlist`}
-            className="text-netflix-gray text-sm hover:text-white transition-colors inline-block mb-6"
+            className="text-netflix-gray text-xs sm:text-sm hover:text-white transition-colors inline-block mb-4 sm:mb-6"
           >
             Back to Watchlist
           </Link>
 
-          <h2 className="text-3xl font-medium mb-2">Start a Decision</h2>
-          <p className="text-netflix-gray mb-8">
+          <h2 className="text-2xl sm:text-3xl font-medium mb-2">Start a Decision</h2>
+          <p className="text-sm sm:text-base text-netflix-gray mb-6 sm:mb-8">
             Describe what kind of movie everyone is in the mood for tonight
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             <div>
               <label
                 htmlFor="vibe"
-                className="block text-sm font-medium mb-2"
+                className="block text-xs sm:text-sm font-medium mb-2"
               >
                 What are you in the mood for?
               </label>
@@ -87,7 +87,7 @@ export default function NewSessionPage() {
                 onChange={(e) => setVibeText(e.target.value)}
                 required
                 rows={4}
-                className="netflix-input w-full resize-none"
+                className="netflix-input w-full resize-none text-sm sm:text-base"
                 placeholder="e.g., Something funny and light, under 2 hours, in English"
               />
               <p className="text-xs text-netflix-gray mt-2">
@@ -96,7 +96,7 @@ export default function NewSessionPage() {
             </div>
 
             {error && (
-              <div className="bg-netflix-red/20 text-netflix-red p-4 rounded text-sm">
+              <div className="bg-netflix-red/20 text-netflix-red p-3 sm:p-4 rounded text-xs sm:text-sm">
                 {error}
               </div>
             )}
@@ -104,7 +104,7 @@ export default function NewSessionPage() {
             <button
               type="submit"
               disabled={loading}
-              className="netflix-btn w-full py-4 text-lg disabled:opacity-50"
+              className="netflix-btn w-full py-3 sm:py-4 text-base sm:text-lg disabled:opacity-50"
             >
               {loading ? 'Finding Movies...' : 'Find Movies'}
             </button>

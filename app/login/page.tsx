@@ -66,14 +66,14 @@ function LoginForm() {
   return (
     <div className="min-h-screen bg-netflix-dark flex flex-col">
       {/* Header */}
-      <header className="px-8 py-6">
-        <h1 className="text-netflix-red text-4xl font-bold tracking-tight">VIBEWATCH</h1>
+      <header className="px-4 sm:px-6 md:px-8 py-4 sm:py-6">
+        <h1 className="text-netflix-red text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">VIBEWATCH</h1>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex items-center justify-center px-4">
-        <div className="w-full max-w-md bg-black/75 rounded p-16 animate-fade-in">
-          <h2 className="text-3xl font-medium mb-7">Sign In</h2>
+      <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-4 sm:py-8">
+        <div className="w-full max-w-md bg-black/75 rounded p-6 sm:p-10 md:p-16 animate-fade-in">
+          <h2 className="text-2xl sm:text-3xl font-medium mb-5 sm:mb-7">Sign In</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

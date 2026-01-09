@@ -73,9 +73,9 @@ export default function ResultsClient({
     <div className="min-h-screen bg-netflix-dark">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-netflix-dark to-transparent">
-        <div className="flex justify-between items-center px-8 py-4">
+        <div className="flex justify-between items-center px-4 sm:px-6 md:px-8 py-3 sm:py-4">
           <Link href="/groups">
-            <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
+            <h1 className="text-netflix-red text-xl sm:text-2xl font-bold tracking-tight">VIBEWATCH</h1>
           </Link>
         </div>
       </header>
@@ -98,33 +98,33 @@ export default function ResultsClient({
         )}
 
         {/* Content */}
-        <div className="relative pt-32 px-8 pb-12">
+        <div className="relative pt-20 sm:pt-24 md:pt-32 px-4 sm:px-6 md:px-8 pb-8 sm:pb-12">
           <div className="max-w-6xl mx-auto">
-            <div className="flex flex-col lg:flex-row gap-12 items-start">
+            <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 lg:gap-12 items-start">
               {/* Poster */}
-              <div className="flex-shrink-0 animate-scale-in">
+              <div className="flex-shrink-0 w-full sm:w-auto mx-auto sm:mx-0 animate-scale-in">
                 {movie.poster_path ? (
                   <Image
                     src={getPosterUrl(movie.poster_path, 'w500') || ''}
                     alt={movie.title}
                     width={300}
                     height={450}
-                    className="rounded shadow-2xl"
+                    className="rounded shadow-2xl w-full sm:w-[300px] h-auto"
                     unoptimized
                   />
                 ) : (
-                  <div className="w-[300px] h-[450px] bg-gray-800 rounded flex items-center justify-center">
-                    <span className="text-gray-500">No poster</span>
+                  <div className="w-full sm:w-[300px] h-[400px] sm:h-[450px] bg-gray-800 rounded flex items-center justify-center">
+                    <span className="text-gray-500 text-sm sm:text-base">No poster</span>
                   </div>
                 )}
               </div>
 
               {/* Info */}
-              <div className="flex-1 animate-slide-up">
-                <p className="text-netflix-red text-lg font-medium mb-2">Tonight&apos;s Pick</p>
-                <h1 className="text-5xl font-bold mb-4">{movie.title}</h1>
+              <div className="flex-1 w-full animate-slide-up">
+                <p className="text-netflix-red text-sm sm:text-base md:text-lg font-medium mb-2">Tonight&apos;s Pick</p>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4">{movie.title}</h1>
                 
-                <div className="flex gap-4 text-sm text-netflix-gray mb-6">
+                <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm text-netflix-gray mb-4 sm:mb-6">
                   <span className="text-green-500 font-medium">
                     {Math.round((movie.vote_average || 0) * 10)}% Match
                   </span>
@@ -132,17 +132,17 @@ export default function ResultsClient({
                   {movie.runtime && <span>{Math.floor(movie.runtime / 60)}h {movie.runtime % 60}m</span>}
                 </div>
 
-                <p className="text-lg text-gray-300 leading-relaxed mb-8 max-w-2xl">
+                <p className="text-base sm:text-lg text-gray-300 leading-relaxed mb-6 sm:mb-8 max-w-2xl">
                   {movie.overview}
                 </p>
 
                 {/* Genres */}
                 {movie.genres && movie.genres.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-8">
+                  <div className="flex flex-wrap gap-2 mb-6 sm:mb-8">
                     {movie.genres.map((genre) => (
                       <span
                         key={genre.id}
-                        className="px-3 py-1 bg-white/10 rounded text-sm"
+                        className="px-2 sm:px-3 py-1 bg-white/10 rounded text-xs sm:text-sm"
                       >
                         {genre.name}
                       </span>
@@ -151,16 +151,16 @@ export default function ResultsClient({
                 )}
 
                 {/* Explanation */}
-                <div className="bg-card-bg rounded p-6 mb-8 max-w-2xl">
-                  <h3 className="font-medium mb-2">Why this pick?</h3>
-                  <p className="text-netflix-gray text-sm">{explanation}</p>
+                <div className="bg-card-bg rounded p-4 sm:p-6 mb-6 sm:mb-8 max-w-2xl">
+                  <h3 className="text-sm sm:text-base font-medium mb-2">Why this pick?</h3>
+                  <p className="text-xs sm:text-sm text-netflix-gray">{explanation}</p>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-4">
+                <div className="flex gap-3 sm:gap-4">
                   <button
                     onClick={() => router.push('/groups')}
-                    className="netflix-btn px-8 py-3 text-lg"
+                    className="netflix-btn px-6 sm:px-8 py-2 sm:py-3 text-sm sm:text-base md:text-lg w-full sm:w-auto"
                   >
                     Back to Groups
                   </button>

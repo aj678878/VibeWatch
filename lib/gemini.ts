@@ -40,20 +40,31 @@ export async function getTMDBSearchFilters(vibeText: string): Promise<TMDBSearch
 
 User's vibe: "${vibeText}"
 
+Analyze the vibe carefully and extract:
+1. Specific genres that match the mood (e.g., "funny" = Comedy, "scary" = Horror, "romantic" = Romance)
+2. Year preferences if mentioned
+3. Key search terms
+
 Return ONLY a JSON object with these fields:
 {
-  "genres": ["Action", "Comedy"],  // Array of genre names (use TMDB genre names)
+  "genres": ["Action", "Comedy"],  // Array of 1-3 specific genre names that BEST match the vibe (use TMDB genre names)
   "year_min": 2001,  // Minimum release year (must be >= 2001)
   "year_max": 2025,  // Maximum release year (current year or later)
   "keywords": ["keyword1", "keyword2"],  // Optional: relevant keywords for search
-  "query": "main search query"  // Main search query string for TMDB
+  "query": "main search query"  // Main search query string extracted from vibe (can be empty if genres are specific enough)
 }
 
 IMPORTANT:
 - Only include Hindi (hi) or English (en) movies
 - year_min must be >= 2001
-- Use standard TMDB genre names (Action, Adventure, Animation, Comedy, Crime, Documentary, Drama, Family, Fantasy, History, Horror, Music, Mystery, Romance, Science Fiction, TV Movie, Thriller, War, Western)
-- If vibe is vague, use popular genres
+- Use standard TMDB genre names: Action, Adventure, Animation, Comedy, Crime, Documentary, Drama, Family, Fantasy, History, Horror, Music, Mystery, Romance, Science Fiction, TV Movie, Thriller, War, Western
+- ALWAYS provide at least 1-2 specific genres that match the vibe (this is critical for getting different results)
+- If vibe mentions "funny/comedy/humor" → include "Comedy"
+- If vibe mentions "scary/horror/thriller" → include "Horror" or "Thriller"
+- If vibe mentions "romantic/love" → include "Romance"
+- If vibe mentions "action/adventure" → include "Action" or "Adventure"
+- If vibe mentions "drama/serious" → include "Drama"
+- If vibe is vague, use 2-3 popular genres that could match
 - Return valid JSON only, no extra text`
 
   try {
@@ -88,8 +99,48 @@ IMPORTANT:
     if (!filters.year_max) {
       filters.year_max = new Date().getFullYear()
     }
-    if (!filters.query && !filters.genres && !filters.keywords) {
-      // Fallback: use vibe text as query
+    
+    // CRITICAL: Ensure we have genres for filtering (this prevents same results)
+    if (!filters.genres || filters.genres.length === 0) {
+      console.warn('[GEMINI] No genres returned, extracting from vibe text...')
+      // Try to extract genres from vibe text as fallback
+      const vibeLower = vibeText.toLowerCase()
+      const extractedGenres: string[] = []
+      
+      if (vibeLower.match(/\b(funny|comedy|humor|humorous|hilarious|comic)\b/)) {
+        extractedGenres.push('Comedy')
+      }
+      if (vibeLower.match(/\b(scary|horror|frightening|terrifying|spooky)\b/)) {
+        extractedGenres.push('Horror')
+      }
+      if (vibeLower.match(/\b(romantic|love|romance|romantic comedy)\b/)) {
+        extractedGenres.push('Romance')
+      }
+      if (vibeLower.match(/\b(action|adventure|thrilling|exciting)\b/)) {
+        extractedGenres.push('Action')
+      }
+      if (vibeLower.match(/\b(drama|serious|emotional|dramatic)\b/)) {
+        extractedGenres.push('Drama')
+      }
+      if (vibeLower.match(/\b(thriller|suspense|suspenseful)\b/)) {
+        extractedGenres.push('Thriller')
+      }
+      if (vibeLower.match(/\b(sci-fi|science fiction|futuristic|space)\b/)) {
+        extractedGenres.push('Science Fiction')
+      }
+      
+      if (extractedGenres.length > 0) {
+        filters.genres = extractedGenres
+        console.log('[GEMINI] Extracted genres from vibe:', extractedGenres)
+      } else {
+        // Last resort: use popular genres
+        filters.genres = ['Drama', 'Comedy']
+        console.log('[GEMINI] Using default genres:', filters.genres)
+      }
+    }
+    
+    if (!filters.query && !filters.keywords) {
+      // Use vibe text as query if no other query provided
       filters.query = vibeText
     }
 

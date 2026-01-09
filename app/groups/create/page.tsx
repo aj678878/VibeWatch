@@ -35,28 +35,28 @@ export default function CreateGroupPage() {
   return (
     <div className="min-h-screen bg-netflix-dark">
       {/* Header */}
-      <header className="px-8 py-4">
+      <header className="px-4 sm:px-6 md:px-8 py-3 sm:py-4">
         <Link href="/groups">
-          <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
+          <h1 className="text-netflix-red text-xl sm:text-2xl font-bold tracking-tight">VIBEWATCH</h1>
         </Link>
       </header>
 
-      <main className="flex items-center justify-center px-4 pt-12">
-        <div className="w-full max-w-lg bg-card-bg rounded p-12 animate-fade-in">
+      <main className="flex items-center justify-center px-4 sm:px-6 pt-8 sm:pt-12 pb-8">
+        <div className="w-full max-w-lg bg-card-bg rounded p-6 sm:p-8 md:p-12 animate-fade-in">
           <Link
             href="/groups"
-            className="text-netflix-gray text-sm hover:text-white transition-colors inline-block mb-6"
+            className="text-netflix-gray text-xs sm:text-sm hover:text-white transition-colors inline-block mb-4 sm:mb-6"
           >
             Back to Groups
           </Link>
           
-          <h2 className="text-3xl font-medium mb-4">Create a Group</h2>
-          <p className="text-netflix-gray mb-8">
+          <h2 className="text-2xl sm:text-3xl font-medium mb-3 sm:mb-4">Create a Group</h2>
+          <p className="text-sm sm:text-base text-netflix-gray mb-6 sm:mb-8">
             Start a new watch group and invite friends to decide on movies together.
           </p>
 
           {error && (
-            <div className="bg-netflix-red/20 text-netflix-red p-4 rounded mb-6 text-sm">
+            <div className="bg-netflix-red/20 text-netflix-red p-3 sm:p-4 rounded mb-4 sm:mb-6 text-xs sm:text-sm">
               {error}
             </div>
           )}
@@ -64,7 +64,7 @@ export default function CreateGroupPage() {
           <button
             onClick={handleCreate}
             disabled={loading}
-            className="netflix-btn w-full py-4 text-lg disabled:opacity-50"
+            className="netflix-btn w-full py-3 sm:py-4 text-base sm:text-lg disabled:opacity-50"
           >
             {loading ? 'Creating...' : 'Create Group'}
           </button>

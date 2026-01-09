@@ -239,24 +239,24 @@ export default function VotingRoundClient({
     <div className="min-h-screen bg-netflix-dark">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-netflix-dark via-netflix-dark/95 to-transparent">
-        <div className="flex justify-between items-center px-8 py-4">
+        <div className="flex justify-between items-center px-4 sm:px-6 md:px-8 py-3 sm:py-4">
           <Link href="/groups">
-            <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
+            <h1 className="text-netflix-red text-xl sm:text-2xl font-bold tracking-tight">VIBEWATCH</h1>
           </Link>
-          <div className="text-sm text-netflix-gray">
+          <div className="text-xs sm:text-sm text-netflix-gray">
             Round {currentRoundNumber} of 5
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="pt-24 px-8 pb-12">
+      <main className="pt-20 sm:pt-24 px-4 sm:px-6 md:px-8 pb-8 sm:pb-12">
         <div className="max-w-7xl mx-auto">
           {/* Progress */}
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-medium">Vote on Movies</h2>
-              <span className="text-netflix-gray">
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 mb-3 sm:mb-4">
+              <h2 className="text-xl sm:text-2xl font-medium">Vote on Movies</h2>
+              <span className="text-sm sm:text-base text-netflix-gray">
                 {votedCount} of {currentMovieIds.length} voted
               </span>
             </div>
@@ -270,23 +270,23 @@ export default function VotingRoundClient({
 
           {/* Participants status */}
           {participantsStatus.length > 0 && (
-            <div className="bg-card-bg rounded p-4 mb-8">
-              <h3 className="text-sm font-medium mb-3">Participants</h3>
+            <div className="bg-card-bg rounded p-3 sm:p-4 mb-6 sm:mb-8">
+              <h3 className="text-xs sm:text-sm font-medium mb-2 sm:mb-3">Participants</h3>
               <div className="space-y-2">
                 {participantsStatus.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
+                  <div key={p.id} className="flex items-center justify-between text-xs sm:text-sm">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
                       <div
-                        className={`w-2 h-2 rounded-full ${
+                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
                           p.hasCompleted ? 'bg-green-500' : 'bg-red-500'
                         }`}
                       />
-                      <span>{p.displayName}</span>
+                      <span className="truncate">{p.displayName}</span>
                       {p.type === 'guest' && (
-                        <span className="text-xs text-netflix-gray">Guest</span>
+                        <span className="text-xs text-netflix-gray flex-shrink-0">Guest</span>
                       )}
                     </div>
-                    <span className="text-netflix-gray">
+                    <span className="text-netflix-gray flex-shrink-0 ml-2">
                       {p.hasCompleted ? 'Done' : 'Voting...'}
                     </span>
                   </div>
@@ -297,23 +297,23 @@ export default function VotingRoundClient({
 
           {/* Status messages */}
           {allVoted && roundStatus && !roundStatus.isComplete && (
-            <div className="bg-card-bg rounded p-4 mb-8 text-center">
-              <p className="text-netflix-gray">
+            <div className="bg-card-bg rounded p-3 sm:p-4 mb-6 sm:mb-8 text-center">
+              <p className="text-xs sm:text-sm text-netflix-gray">
                 You have voted on all movies. Waiting for {roundStatus.waitingForParticipants} other {roundStatus.waitingForParticipants === 1 ? 'participant' : 'participants'}...
               </p>
             </div>
           )}
           
           {roundStatus && roundStatus.isComplete && (
-            <div className="bg-green-500/20 rounded p-4 mb-8 text-center">
-              <p className="text-green-400">
+            <div className="bg-green-500/20 rounded p-3 sm:p-4 mb-6 sm:mb-8 text-center">
+              <p className="text-xs sm:text-sm text-green-400">
                 All participants have voted. Processing results...
               </p>
             </div>
           )}
 
           {/* Movie grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
             {currentMovieIds.map((tmdbId) => (
               <MovieCard
                 key={tmdbId}

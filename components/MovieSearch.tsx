@@ -89,21 +89,21 @@ export default function MovieSearch({ onSelectMovie, groupId }: MovieSearchProps
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search for movies..."
-        className="netflix-input w-full md:w-96"
+        className="netflix-input w-full md:w-96 text-sm sm:text-base"
       />
 
       {loading && (
-        <div className="absolute top-full left-0 right-0 md:w-96 mt-2 bg-card-bg rounded p-4 text-netflix-gray text-sm">
+        <div className="absolute top-full left-0 right-0 md:w-96 mt-2 bg-card-bg rounded p-3 sm:p-4 text-netflix-gray text-xs sm:text-sm">
           Searching...
         </div>
       )}
 
       {results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 md:w-[600px] mt-2 bg-card-bg rounded shadow-2xl max-h-[400px] overflow-y-auto z-50">
+        <div className="absolute top-full left-0 right-0 md:w-[600px] mt-2 bg-card-bg rounded shadow-2xl max-h-[300px] sm:max-h-[400px] overflow-y-auto z-50">
           {results.map((movie) => (
             <div
               key={movie.id}
-              className="flex items-center gap-4 p-3 hover:bg-card-hover transition-colors border-b border-gray-800 last:border-0"
+              className="flex items-center gap-2 sm:gap-4 p-2 sm:p-3 hover:bg-card-hover transition-colors border-b border-gray-800 last:border-0"
             >
               {movie.poster_path ? (
                 <Image
@@ -111,17 +111,17 @@ export default function MovieSearch({ onSelectMovie, groupId }: MovieSearchProps
                   alt={movie.title}
                   width={60}
                   height={90}
-                  className="w-12 h-18 object-cover rounded"
+                  className="w-10 h-15 sm:w-12 sm:h-18 object-cover rounded flex-shrink-0"
                   unoptimized
                 />
               ) : (
-                <div className="w-12 h-18 bg-gray-700 rounded flex items-center justify-center text-xs text-gray-500">
+                <div className="w-10 h-15 sm:w-12 sm:h-18 bg-gray-700 rounded flex items-center justify-center text-xs text-gray-500 flex-shrink-0">
                   No image
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h4 className="font-medium line-clamp-1">{movie.title}</h4>
-                <p className="text-sm text-netflix-gray line-clamp-1">{movie.overview}</p>
+                <h4 className="font-medium text-sm sm:text-base line-clamp-1">{movie.title}</h4>
+                <p className="text-xs sm:text-sm text-netflix-gray line-clamp-1">{movie.overview}</p>
                 <p className="text-xs text-netflix-gray mt-1">
                   {movie.release_date?.split('-')[0] || 'N/A'} | Rating: {movie.vote_average?.toFixed(1) || 'N/A'}
                 </p>
@@ -129,7 +129,7 @@ export default function MovieSearch({ onSelectMovie, groupId }: MovieSearchProps
               <button
                 onClick={() => handleAddToWatchlist(movie)}
                 disabled={adding === movie.id}
-                className="netflix-btn px-4 py-2 text-sm whitespace-nowrap disabled:opacity-50"
+                className="netflix-btn px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm whitespace-nowrap disabled:opacity-50 flex-shrink-0"
               >
                 {adding === movie.id ? 'Adding...' : 'Add'}
               </button>

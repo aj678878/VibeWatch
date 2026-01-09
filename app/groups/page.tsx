@@ -40,12 +40,12 @@ export default async function GroupsPage() {
     <div className="min-h-screen bg-netflix-dark">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-netflix-dark to-transparent">
-        <div className="flex justify-between items-center px-8 py-4">
+        <div className="flex justify-between items-center px-4 sm:px-6 md:px-8 py-3 sm:py-4">
           <Link href="/groups">
-            <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
+            <h1 className="text-netflix-red text-xl sm:text-2xl font-bold tracking-tight">VIBEWATCH</h1>
           </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-netflix-gray text-sm">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <span className="text-netflix-gray text-xs sm:text-sm hidden sm:inline">
               {user.email || `Guest ${user.id.slice(0, 8)}`}
             </span>
             <LogoutButton />
@@ -54,13 +54,13 @@ export default async function GroupsPage() {
       </header>
 
       {/* Main content */}
-      <main className="pt-24 px-8 pb-12">
+      <main className="pt-20 sm:pt-24 px-4 sm:px-6 md:px-8 pb-8 sm:pb-12">
         <div className="max-w-6xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl font-medium">My Groups</h2>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
+            <h2 className="text-2xl sm:text-3xl font-medium">My Groups</h2>
             <Link
               href="/groups/create"
-              className="netflix-btn px-6 py-3"
+              className="netflix-btn px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base w-full sm:w-auto text-center"
             >
               Create Group
             </Link>

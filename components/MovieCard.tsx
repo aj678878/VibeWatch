@@ -101,7 +101,7 @@ export default function MovieCard({
               ? 'bg-green-500/30' 
               : 'bg-red-500/30'
           }`}>
-            <span className={`text-4xl font-bold ${
+            <span className={`text-2xl sm:text-3xl md:text-4xl font-bold ${
               userVote.vote === 'yes' ? 'text-green-400' : 'text-red-400'
             }`}>
               {userVote.vote === 'yes' ? 'YES' : 'NO'}
@@ -111,10 +111,10 @@ export default function MovieCard({
       </div>
 
       {/* Info */}
-      <div className="p-4">
-        <h3 className="font-medium text-lg line-clamp-1 mb-1">{movie.title}</h3>
-        <p className="text-sm text-netflix-gray line-clamp-2 mb-3">{movie.overview}</p>
-        <div className="flex gap-3 text-xs text-netflix-gray mb-4">
+      <div className="p-3 sm:p-4">
+        <h3 className="font-medium text-base sm:text-lg line-clamp-1 mb-1">{movie.title}</h3>
+        <p className="text-xs sm:text-sm text-netflix-gray line-clamp-2 mb-2 sm:mb-3">{movie.overview}</p>
+        <div className="flex flex-wrap gap-2 sm:gap-3 text-xs text-netflix-gray mb-3 sm:mb-4">
           <span>{movie.release_date?.split('-')[0] || 'N/A'}</span>
           <span>Rating: {movie.vote_average?.toFixed(1) || 'N/A'}</span>
           {movie.runtime && <span>{movie.runtime} min</span>}
@@ -122,14 +122,14 @@ export default function MovieCard({
 
         {/* Voting UI */}
         {userVote ? (
-          <div className={`p-3 rounded text-center text-sm ${
+          <div className={`p-2 sm:p-3 rounded text-center text-xs sm:text-sm ${
             userVote.vote === 'yes'
               ? 'bg-green-500/20 text-green-400'
               : 'bg-red-500/20 text-red-400'
           }`}>
             Voted {userVote.vote.toUpperCase()}
             {userVote.reason && (
-              <p className="text-xs text-netflix-gray mt-1">{userVote.reason}</p>
+              <p className="text-xs text-netflix-gray mt-1 line-clamp-2">{userVote.reason}</p>
             )}
           </div>
         ) : showReasonInput ? (
@@ -138,14 +138,14 @@ export default function MovieCard({
               value={reasonText}
               onChange={(e) => setReasonText(e.target.value)}
               placeholder="Why not? (optional)"
-              className="netflix-input w-full text-sm resize-none"
+              className="netflix-input w-full text-xs sm:text-sm resize-none"
               rows={2}
             />
             <div className="flex gap-2">
               <button
                 onClick={handleSubmitReason}
                 disabled={disabled}
-                className="flex-1 py-2 bg-red-600 hover:bg-red-700 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex-1 py-2 bg-red-600 hover:bg-red-700 rounded text-xs sm:text-sm font-medium transition-colors disabled:opacity-50"
               >
                 Confirm No
               </button>
@@ -154,7 +154,7 @@ export default function MovieCard({
                   setShowReasonInput(false)
                   setReasonText('')
                 }}
-                className="px-4 py-2 netflix-btn-secondary text-sm"
+                className="px-3 sm:px-4 py-2 netflix-btn-secondary text-xs sm:text-sm"
               >
                 Cancel
               </button>
@@ -165,14 +165,14 @@ export default function MovieCard({
             <button
               onClick={() => handleVote('yes')}
               disabled={disabled}
-              className="flex-1 py-3 bg-green-600 hover:bg-green-700 rounded font-medium transition-colors disabled:opacity-50"
+              className="flex-1 py-2 sm:py-3 bg-green-600 hover:bg-green-700 rounded text-sm sm:text-base font-medium transition-colors disabled:opacity-50"
             >
               Yes
             </button>
             <button
               onClick={() => handleVote('no')}
               disabled={disabled}
-              className="flex-1 py-3 bg-red-600 hover:bg-red-700 rounded font-medium transition-colors disabled:opacity-50"
+              className="flex-1 py-2 sm:py-3 bg-red-600 hover:bg-red-700 rounded text-sm sm:text-base font-medium transition-colors disabled:opacity-50"
             >
               No
             </button>

@@ -67,21 +67,21 @@ export default function JoinGroupPage() {
   return (
     <div className="min-h-screen bg-netflix-dark">
       {/* Header */}
-      <header className="px-8 py-4">
+      <header className="px-4 sm:px-6 md:px-8 py-3 sm:py-4">
         <Link href="/groups">
-          <h1 className="text-netflix-red text-2xl font-bold tracking-tight">VIBEWATCH</h1>
+          <h1 className="text-netflix-red text-xl sm:text-2xl font-bold tracking-tight">VIBEWATCH</h1>
         </Link>
       </header>
 
-      <main className="flex items-center justify-center px-4 pt-24">
-        <div className="w-full max-w-lg bg-card-bg rounded p-12 animate-fade-in">
-          <h2 className="text-2xl font-medium mb-2">Join Group</h2>
-          <p className="text-netflix-gray mb-6">Invite code: <span className="font-mono">{code.toUpperCase()}</span></p>
+      <main className="flex items-center justify-center px-4 sm:px-6 pt-12 sm:pt-24 pb-8">
+        <div className="w-full max-w-lg bg-card-bg rounded p-6 sm:p-8 md:p-12 animate-fade-in">
+          <h2 className="text-xl sm:text-2xl font-medium mb-2">Join Group</h2>
+          <p className="text-sm sm:text-base text-netflix-gray mb-4 sm:mb-6">Invite code: <span className="font-mono">{code.toUpperCase()}</span></p>
 
           {isGuest ? (
             <form onSubmit={handleJoin} className="space-y-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium mb-2">
+                <label htmlFor="name" className="block text-xs sm:text-sm font-medium mb-2">
                   Your preferred name
                 </label>
                 <input
@@ -92,7 +92,7 @@ export default function JoinGroupPage() {
                   required
                   minLength={1}
                   maxLength={50}
-                  className="netflix-input w-full"
+                  className="netflix-input w-full text-sm sm:text-base"
                   placeholder="Enter your name"
                 />
                 <p className="text-xs text-netflix-gray mt-1">
@@ -101,7 +101,7 @@ export default function JoinGroupPage() {
               </div>
 
               {error && (
-                <div className="bg-netflix-red/20 text-netflix-red p-4 rounded text-sm">
+                <div className="bg-netflix-red/20 text-netflix-red p-3 sm:p-4 rounded text-xs sm:text-sm">
                   {error}
                 </div>
               )}
@@ -109,18 +109,18 @@ export default function JoinGroupPage() {
               <button
                 type="submit"
                 disabled={loading || !preferredName.trim()}
-                className="netflix-btn w-full py-3 disabled:opacity-50"
+                className="netflix-btn w-full py-3 text-sm sm:text-base disabled:opacity-50"
               >
                 {loading ? 'Joining...' : 'Join as Guest'}
               </button>
             </form>
           ) : (
             <div>
-              <p className="text-netflix-gray mb-4">You are logged in. Joining as member...</p>
+              <p className="text-sm sm:text-base text-netflix-gray mb-4">You are logged in. Joining as member...</p>
               <button
                 onClick={handleJoin}
                 disabled={loading}
-                className="netflix-btn w-full py-3 disabled:opacity-50"
+                className="netflix-btn w-full py-3 text-sm sm:text-base disabled:opacity-50"
               >
                 {loading ? 'Joining...' : 'Join Group'}
               </button>

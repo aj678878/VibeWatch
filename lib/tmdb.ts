@@ -129,6 +129,40 @@ export function getBackdropUrl(backdropPath: string | null, size: 'w300' | 'w780
 }
 
 /**
+ * TMDB Genre ID mapping (name to ID)
+ */
+const TMDB_GENRE_IDS: Record<string, number> = {
+  'Action': 28,
+  'Adventure': 12,
+  'Animation': 16,
+  'Comedy': 35,
+  'Crime': 80,
+  'Documentary': 99,
+  'Drama': 18,
+  'Family': 10751,
+  'Fantasy': 14,
+  'History': 36,
+  'Horror': 27,
+  'Music': 10402,
+  'Mystery': 9648,
+  'Romance': 10749,
+  'Science Fiction': 878,
+  'TV Movie': 10770,
+  'Thriller': 53,
+  'War': 10752,
+  'Western': 37,
+}
+
+/**
+ * Get genre IDs from genre names
+ */
+function getGenreIds(genreNames: string[]): number[] {
+  return genreNames
+    .map(name => TMDB_GENRE_IDS[name])
+    .filter((id): id is number => id !== undefined)
+}
+
+/**
  * Search TMDB with filters (genres, year range, etc.)
  * Returns movies sorted by popularity (desc)
  */
@@ -146,8 +180,17 @@ export async function searchMoviesWithFilters(filters: {
   const yearFrom = filters.year_min || 2001
   const yearTo = filters.year_max || new Date().getFullYear()
 
-  // Build discover API URL with filters
-  const params = new URLSearchParams({
+  console.log('[TMDB] Searching with filters:', {
+    query: filters.query,
+    genres: filters.genres,
+    yearRange: `${yearFrom}-${yearTo}`,
+  })
+
+  // Convert genre names to IDs
+  const genreIds = filters.genres && filters.genres.length > 0 ? getGenreIds(filters.genres) : []
+  
+  // Build base params for discover API
+  const baseParams = new URLSearchParams({
     api_key: TMDB_API_KEY,
     language: 'en-US',
     sort_by: 'popularity.desc',
@@ -156,40 +199,52 @@ export async function searchMoviesWithFilters(filters: {
     page: '1',
   })
 
-  // If we have a query, use search API first, then filter
-  if (filters.query && filters.query.trim()) {
+  // Add genre filter if available (this is the key to getting different results!)
+  if (genreIds.length > 0) {
+    baseParams.append('with_genres', genreIds.join(','))
+    console.log('[TMDB] Using genre filter:', genreIds, '(', filters.genres?.join(', '), ')')
+  }
+
+  // If we have a query, try search API first (more specific for text queries)
+  if (filters.query && filters.query.trim() && genreIds.length === 0) {
+    console.log('[TMDB] Using search API with query:', filters.query)
     const searchUrl = `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(filters.query)}&page=1&language=en-US`
     const searchResponse = await fetch(searchUrl)
     
-    if (!searchResponse.ok) {
-      throw new Error(`TMDB API error: ${searchResponse.statusText}`)
-    }
-    
-    const searchData = await searchResponse.json()
-    
-    // Filter results: Hindi/English only, year range, sort by popularity desc
-    const filtered = searchData.results
-      .filter((movie: any) => {
-        const lang = movie.original_language || ''
-        const year = movie.release_date ? parseInt(movie.release_date.split('-')[0]) : 0
-        return (lang === 'en' || lang === 'hi') && year >= yearFrom && year <= yearTo
-      })
-      .sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0))
-    
-    return {
-      ...searchData,
-      results: filtered,
+    if (searchResponse.ok) {
+      const searchData = await searchResponse.json()
+      
+      // Filter results: Hindi/English only, year range, sort by popularity desc
+      const filtered = searchData.results
+        .filter((movie: any) => {
+          const lang = movie.original_language || ''
+          const year = movie.release_date ? parseInt(movie.release_date.split('-')[0]) : 0
+          return (lang === 'en' || lang === 'hi') && year >= yearFrom && year <= yearTo
+        })
+        .sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0))
+      
+      if (filtered.length >= 5) {
+        console.log('[TMDB] Found', filtered.length, 'movies from search query')
+        return {
+          ...searchData,
+          results: filtered,
+        }
+      }
+      console.log('[TMDB] Search query returned only', filtered.length, 'movies, falling back to discover API')
     }
   }
 
-  // Use discover API for English and Hindi separately, then combine
+  // Use discover API with genre filters (this ensures different results based on vibe)
+  console.log('[TMDB] Using discover API', genreIds.length > 0 ? `with genres: ${genreIds.join(',')}` : 'without genres')
+  
+  // Fetch English and Hindi movies separately (TMDB limitation)
   const [enResponse, hiResponse] = await Promise.all([
-    fetch(`${TMDB_BASE_URL}/discover/movie?${params.toString()}&with_original_language=en`),
-    fetch(`${TMDB_BASE_URL}/discover/movie?${params.toString()}&with_original_language=hi`)
+    fetch(`${TMDB_BASE_URL}/discover/movie?${baseParams.toString()}&with_original_language=en`),
+    fetch(`${TMDB_BASE_URL}/discover/movie?${baseParams.toString()}&with_original_language=hi`)
   ])
   
   if (!enResponse.ok || !hiResponse.ok) {
-    throw new Error(`TMDB API error`)
+    throw new Error(`TMDB API error: ${enResponse.statusText || hiResponse.statusText}`)
   }
   
   const [enData, hiData] = await Promise.all([enResponse.json(), hiResponse.json()])
@@ -197,6 +252,8 @@ export async function searchMoviesWithFilters(filters: {
   // Combine and sort by popularity
   const combined = [...enData.results, ...hiData.results]
     .sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0))
+  
+  console.log('[TMDB] Discover API returned', combined.length, 'total movies (EN:', enData.results.length, 'HI:', hiData.results.length, ')')
   
   return {
     ...enData,
