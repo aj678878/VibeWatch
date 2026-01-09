@@ -89,7 +89,7 @@ Be specific and only include constraints you can confidently infer. If uncertain
           content: prompt,
         },
       ],
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.1-70b-versatile',
       temperature: 0.3,
       response_format: { type: 'json_object' },
     })
@@ -191,7 +191,7 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restri
           content: prompt,
         },
       ],
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.1-70b-versatile',
       temperature: 0.7,
       response_format: { type: 'json_object' },
     })
@@ -325,7 +325,7 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
           content: prompt,
         },
       ],
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.1-70b-versatile',
       temperature: 0.7,
       response_format: { type: 'json_object' },
     })
