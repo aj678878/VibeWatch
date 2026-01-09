@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
-import { recommendMovies } from '@/lib/groq'
+import { getGroupRecommendations } from '@/lib/ai-provider'
 
 export async function POST(
   request: Request,
@@ -73,7 +73,7 @@ export async function POST(
     const watchlistTmdbIds = session.group.watchlists.map((w) => w.tmdb_id)
 
     // Get AI recommendation
-    const recommendation = await recommendMovies(
+    const recommendation = await getGroupRecommendations(
       session.vibe_text,
       allVotes,
       roundHistory,

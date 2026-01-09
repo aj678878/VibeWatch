@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentParticipant } from '@/lib/participant'
 import { selectNextRoundMovies } from '@/lib/ai/movie-selector'
-import { recommendMovies, recommendMovieForSoloUser } from '@/lib/groq'
+import { getSoloRecommendation, getGroupRecommendations } from '@/lib/ai-provider'
 
 export async function POST(
   request: Request,
@@ -108,7 +108,7 @@ export async function POST(
         )
 
         // Get AI recommendation based on solo user's votes
-        const recommendation = await recommendMovieForSoloUser(
+        const recommendation = await getSoloRecommendation(
           session.vibe_text,
           currentRoundVotes,
           shownMovieIds
@@ -242,7 +242,7 @@ export async function POST(
 
         const watchlistTmdbIds = session.group.watchlists.map((w) => w.tmdb_id)
 
-        const recommendation = await recommendMovies(
+        const recommendation = await getGroupRecommendations(
           session.vibe_text,
           allSessionVotes,
           roundHistory,

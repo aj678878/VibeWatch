@@ -61,6 +61,12 @@ export default function VotingRoundClient({
     const pollStatus = async () => {
       try {
         const response = await fetch(`/api/sessions/${sessionId}/status`)
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`[CLIENT] Status poll failed: ${response.status}`, errorText)
+          return
+        }
+        
         if (response.ok) {
           const data = await response.json()
           setSessionStatus(data.session.status)
@@ -110,7 +116,23 @@ export default function VotingRoundClient({
           }
         }
       } catch (error) {
-        console.error('Error polling status:', error)
+        const errorDetails = {
+          error: error instanceof Error ? error.message : String(error),
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString(),
+          context: { sessionId, roundNumber },
+        }
+        console.error('[CLIENT] Error polling status:', errorDetails)
+        
+        // Try to log to server (non-blocking)
+        fetch('/api/log-error', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(errorDetails),
+        }).catch(() => {
+          // Ignore if logging endpoint doesn't exist
+        })
       }
     }
 
@@ -148,14 +170,24 @@ export default function VotingRoundClient({
         }),
       })
 
+      // Parse response first
+      const result = await response.json().catch(() => ({ error: 'Failed to parse response' }))
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        const errorMessage = errorData.error || `Failed to submit vote (${response.status})`
-        console.error('Vote submission error:', errorMessage, errorData)
+        // Check if vote was saved but recommendation failed
+        const errorMessage = result.error || `Failed to submit vote (${response.status})`
+        console.error('Vote submission error:', errorMessage, result)
+        
+        // If it's a recommendation error, the vote was likely saved
+        if (result.error && result.error.includes('recommendation')) {
+          console.warn('[CLIENT] Vote may have been saved but recommendation failed')
+          // Still show error but indicate vote might be saved
+          throw new Error(`${errorMessage}\n\nNote: Your vote may have been saved. Please refresh the page to check.`)
+        }
+        
         throw new Error(errorMessage)
       }
 
-      const result = await response.json()
       console.log('Vote submitted successfully:', result)
 
       setUserVotes((prev) => ({
@@ -167,8 +199,33 @@ export default function VotingRoundClient({
         },
       }))
     } catch (error) {
-      console.error('Error submitting vote:', error)
+      // Enhanced error logging
       const errorMessage = error instanceof Error ? error.message : 'Failed to submit vote. Please try again.'
+      const errorDetails = {
+        error: errorMessage,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+        context: {
+          sessionId,
+          roundId,
+          roundNumber,
+          movieTmdbId: tmdbId,
+          vote,
+        },
+      }
+      
+      console.error('[CLIENT] Error submitting vote:', errorDetails)
+      
+      // Try to log to server for debugging (non-blocking)
+      fetch('/api/log-error', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(errorDetails),
+      }).catch(() => {
+        // Ignore if logging endpoint doesn't exist
+      })
+      
       alert(errorMessage)
     } finally {
       setLoading(false)

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentParticipant } from '@/lib/participant'
 import { selectNextRoundMovies } from '@/lib/ai/movie-selector'
-import { recommendMovies, recommendMovieForSoloUser } from '@/lib/groq'
+import { getSoloRecommendation, getGroupRecommendations } from '@/lib/ai-provider'
 
 export async function POST(request: NextRequest) {
   try {
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
         console.log('Shown movie IDs:', shownMovieIds)
 
         // Get AI recommendation based on solo user's votes
-        const recommendation = await recommendMovieForSoloUser(
+        const recommendation = await getSoloRecommendation(
           freshRound.session.vibe_text,
           currentRoundVotes,
           shownMovieIds
@@ -259,13 +259,35 @@ export async function POST(request: NextRequest) {
         console.error('[VOTE] Error in solo mode Groq recommendation:', error)
         const errorMessage = error instanceof Error ? error.message : String(error)
         const errorStack = error instanceof Error ? error.stack : undefined
-        console.error('[VOTE] Error details:', { errorMessage, errorStack })
+        
+        // Log full error details
+        console.error('[VOTE] Error details:', {
+          errorMessage,
+          errorStack,
+          errorName: error instanceof Error ? error.constructor.name : typeof error,
+          sessionId: freshRound.session_id,
+          vibeText: freshRound.session.vibe_text,
+          votesCount: currentRoundVotes.length,
+        })
+        
+        // Check if it's a model error
+        if (errorMessage.includes('model') || errorMessage.includes('decommissioned')) {
+          console.error('[VOTE] Model error detected - check Groq model name')
+        }
+        
+        // Check if it's an API key error
+        if (errorMessage.includes('API key') || errorMessage.includes('GROQ_API_KEY')) {
+          console.error('[VOTE] API key error - check GROQ_API_KEY is set')
+        }
         
         // Return detailed error for debugging
         return NextResponse.json(
           { 
+            success: false,
             error: 'Failed to generate recommendation. Please try again.',
-            details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+            details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+            // Include error type for client-side handling
+            errorType: error instanceof Error ? error.constructor.name : 'UnknownError'
           },
           { status: 500 }
         )
@@ -362,7 +384,7 @@ export async function POST(request: NextRequest) {
           })
         ).map((w) => w.tmdb_id)
 
-        const recommendation = await recommendMovies(
+        const recommendation = await getGroupRecommendations(
           freshRound.session.vibe_text,
           allVotes,
           roundHistory,

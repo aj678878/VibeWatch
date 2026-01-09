@@ -18,6 +18,7 @@
     "@supabase/ssr": "^0.5.1",
     "@prisma/client": "^5.9.0",
     "groq-sdk": "^0.3.0",
+    "@google/generative-ai": "^0.21.0",
     "nanoid": "^5.0.0"
   },
   "devDependencies": {

@@ -89,7 +89,7 @@ Be specific and only include constraints you can confidently infer. If uncertain
           content: prompt,
         },
       ],
-      model: 'llama-3.1-70b-versatile',
+      model: 'llama-3.1-8b-instant',
       temperature: 0.3,
       response_format: { type: 'json_object' },
     })
@@ -180,21 +180,42 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restri
     console.log('  - NO votes:', noVotes.length)
     console.log('  - Shown movie IDs:', shownMovieIds)
     
-    const completion = await groq.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a movie recommendation expert. You have extensive knowledge of movies and their TMDB IDs. Recommend movies that match user preferences. IMPORTANT: Only recommend Hindi or English movies released after 2000. Return only valid JSON.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      model: 'llama-3.1-70b-versatile',
-      temperature: 0.7,
-      response_format: { type: 'json_object' },
-    })
+    console.log('Calling Groq API with model: llama-3.1-8b-instant')
+    console.log('GROQ_API_KEY is set:', !!process.env.GROQ_API_KEY)
+    
+    let completion
+    try {
+      completion = await groq.chat.completions.create({
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a movie recommendation expert. You have extensive knowledge of movies and their TMDB IDs. Recommend movies that match user preferences. IMPORTANT: Only recommend Hindi or English movies released after 2000. Return only valid JSON.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        model: 'llama-3.1-8b-instant',
+        temperature: 0.7,
+        response_format: { type: 'json_object' },
+      })
+    } catch (apiError) {
+      console.error('Groq API call failed:', apiError)
+      if (apiError instanceof Error) {
+        console.error('API Error message:', apiError.message)
+        console.error('API Error name:', apiError.constructor.name)
+        // Check if it's a model error
+        if (apiError.message.includes('model') || apiError.message.includes('decommissioned')) {
+          throw new Error(`Groq model error: ${apiError.message}. Please check available models at https://console.groq.com/docs/models`)
+        }
+        // Check if it's an auth error
+        if (apiError.message.includes('401') || apiError.message.includes('unauthorized')) {
+          throw new Error('Groq API authentication failed. Please check GROQ_API_KEY is valid.')
+        }
+      }
+      throw apiError
+    }
 
     const content = completion.choices[0]?.message?.content
     console.log('Groq raw response:', content)
@@ -312,23 +333,40 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
 
     console.log('=== GROQ FINAL RESOLUTION DEBUG ===')
     console.log('Input prompt:', prompt)
+    console.log('Calling Groq API with model: llama-3.1-8b-instant')
+    console.log('GROQ_API_KEY is set:', !!process.env.GROQ_API_KEY)
     
-    const completion = await groq.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a fair movie recommendation assistant. Recommend movies that minimize objections while respecting group preferences. IMPORTANT: Only recommend Hindi or English movies released after 2000. Return only valid JSON with tmdb_id, title, reason, and explanation fields.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      model: 'llama-3.1-70b-versatile',
-      temperature: 0.7,
-      response_format: { type: 'json_object' },
-    })
+    let completion
+    try {
+      completion = await groq.chat.completions.create({
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a fair movie recommendation assistant. Recommend movies that minimize objections while respecting group preferences. IMPORTANT: Only recommend Hindi or English movies released after 2000. Return only valid JSON with tmdb_id, title, reason, and explanation fields.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        model: 'llama-3.1-8b-instant',
+        temperature: 0.7,
+        response_format: { type: 'json_object' },
+      })
+    } catch (apiError) {
+      console.error('Groq API call failed:', apiError)
+      if (apiError instanceof Error) {
+        console.error('API Error message:', apiError.message)
+        if (apiError.message.includes('model') || apiError.message.includes('decommissioned')) {
+          throw new Error(`Groq model error: ${apiError.message}. Please check available models at https://console.groq.com/docs/models`)
+        }
+        if (apiError.message.includes('401') || apiError.message.includes('unauthorized')) {
+          throw new Error('Groq API authentication failed. Please check GROQ_API_KEY is valid.')
+        }
+      }
+      throw apiError
+    }
 
     const content = completion.choices[0]?.message?.content
     console.log('Groq raw response:', content)

@@ -50,14 +50,28 @@
 
 ### What to Look For in Logs
 
-When debugging the Groq recommendation error, search for:
-
+**Server-Side Errors** (from API routes):
 - `[VOTE] Error in solo mode Groq recommendation:` - Shows the error
 - `Error getting solo recommendation:` - Shows Groq API errors
 - `GROQ_API_KEY` - Check if API key is missing
 - `Failed to parse Groq JSON response` - JSON parsing errors
 - `Invalid Groq response` - Validation errors
 - `No response content from Groq API` - Empty responses
+
+**Client-Side Errors** (from browser):
+- `[CLIENT ERROR]` - Errors that occurred in the browser
+- These are logged via the `/api/log-error` endpoint
+- Look for errors with `context` object showing sessionId, roundId, etc.
+- Common client errors:
+  - Network errors (fetch failed)
+  - JSON parsing errors
+  - Missing data errors
+  - Navigation errors
+
+**Important**: If you see an error in a browser modal but nothing in Vercel logs:
+1. Check for `[CLIENT ERROR]` entries in the logs
+2. Check the browser console (F12 → Console tab) for detailed errors
+3. The error might be a client-side only issue (network, CORS, etc.)
 
 ---
 
@@ -150,6 +164,55 @@ When debugging the Groq recommendation error, search for:
 - [ ] Save the variable
 - [ ] Redeploy your project
 - [ ] Verify in logs that warning is gone
+
+---
+
+## Part 3: Debugging Browser Errors That Don't Show in Vercel Logs
+
+### Why Some Errors Don't Appear in Vercel Logs
+
+Some errors happen **client-side** (in the browser) and never reach the server:
+- Network errors (connection failed, timeout)
+- CORS errors
+- Client-side JavaScript errors
+- Browser console errors
+
+### How to Find Client-Side Errors
+
+**Method 1: Browser Console (Easiest)**
+1. Open your app in the browser
+2. Press **F12** (or right-click → Inspect)
+3. Go to **Console** tab
+4. Look for red error messages
+5. Click on errors to see full stack traces
+
+**Method 2: Vercel Logs (After Deployment)**
+1. After deploying the updated code, client errors will be logged
+2. Search for `[CLIENT ERROR]` in Vercel logs
+3. These are sent from the browser to `/api/log-error` endpoint
+
+**Method 3: Network Tab**
+1. Open browser DevTools (F12)
+2. Go to **Network** tab
+3. Look for failed requests (red status codes)
+4. Click on failed requests to see error details
+
+### Common Client-Side Errors
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Failed to fetch` | Network error, CORS, or server down | Check network connection, verify API routes are accessible |
+| `JSON.parse error` | Invalid JSON response | Check API route returns valid JSON |
+| `Cannot read property X` | Missing data | Check API response structure |
+| `Round ID is missing` | State not initialized | Refresh page, check roundId prop |
+
+### How to Report Client Errors
+
+When reporting an error:
+1. **Screenshot the browser modal/alert**
+2. **Copy the browser console error** (F12 → Console)
+3. **Check Vercel logs** for `[CLIENT ERROR]` entries
+4. **Note the exact steps** that triggered the error
 
 ---
 
