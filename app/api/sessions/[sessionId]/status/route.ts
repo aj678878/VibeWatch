@@ -89,6 +89,18 @@ export async function GET(
     const waitingCount = totalParticipants - completedCount
     const isRoundComplete = waitingCount === 0
 
+    console.log(`[STATUS] Session ${sessionId}, Round ${session.current_round}: ${completedCount}/${totalParticipants} completed, isComplete: ${isRoundComplete}, session.status: ${session.status}`)
+
+    // If session is completed, log that we're redirecting
+    if (session.status === 'completed') {
+      console.log(`[STATUS] Session ${sessionId} is completed, final movie: ${session.final_movie_tmdb_id}`)
+    }
+
+    // If we've moved to a new round, log that
+    if (session.current_round > currentRound.round_number) {
+      console.log(`[STATUS] Session ${sessionId} has moved to round ${session.current_round}, current round was ${currentRound.round_number}`)
+    }
+
     return NextResponse.json({
       session: {
         id: session.id,

@@ -13,6 +13,7 @@ interface UserVote {
 
 interface VotingRoundClientProps {
   sessionId: string
+  roundId: string
   roundNumber: number
   movieTmdbIds: number[]
   userVotes: UserVote[]
@@ -20,6 +21,7 @@ interface VotingRoundClientProps {
 
 export default function VotingRoundClient({
   sessionId,
+  roundId: initialRoundId,
   roundNumber,
   movieTmdbIds,
   userVotes: initialUserVotes,
@@ -35,7 +37,7 @@ export default function VotingRoundClient({
     }, {} as Record<number, UserVote>)
   )
   const [loading, setLoading] = useState(false)
-  const [roundId, setRoundId] = useState<string | null>(null)
+  const [roundId, setRoundId] = useState<string>(initialRoundId)
   const [sessionStatus, setSessionStatus] = useState<string>('active')
   const [currentRoundNumber, setCurrentRoundNumber] = useState<number>(roundNumber)
   const [currentMovieIds, setCurrentMovieIds] = useState<number[]>(movieTmdbIds)
@@ -125,7 +127,11 @@ export default function VotingRoundClient({
     vote: 'yes' | 'no',
     reason?: string
   ) => {
-    if (!roundId) return
+    if (!roundId) {
+      console.error('Cannot vote: roundId is missing')
+      alert('Round ID is missing. Please refresh the page.')
+      return
+    }
 
     setLoading(true)
     try {
@@ -143,8 +149,14 @@ export default function VotingRoundClient({
       })
 
       if (!response.ok) {
-        throw new Error('Failed to submit vote')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        const errorMessage = errorData.error || `Failed to submit vote (${response.status})`
+        console.error('Vote submission error:', errorMessage, errorData)
+        throw new Error(errorMessage)
       }
+
+      const result = await response.json()
+      console.log('Vote submitted successfully:', result)
 
       setUserVotes((prev) => ({
         ...prev,
@@ -156,7 +168,8 @@ export default function VotingRoundClient({
       }))
     } catch (error) {
       console.error('Error submitting vote:', error)
-      alert('Failed to submit vote. Please try again.')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit vote. Please try again.'
+      alert(errorMessage)
     } finally {
       setLoading(false)
     }

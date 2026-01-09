@@ -7,9 +7,13 @@ import { recommendMovies, recommendMovieForSoloUser } from '@/lib/groq'
 
 export async function POST(request: NextRequest) {
   try {
-    const { roundId, movieTmdbId, vote, reasonText } = await request.json()
+    const body = await request.json()
+    const { roundId, movieTmdbId, vote, reasonText } = body
+
+    console.log('[VOTE] Received vote submission:', { roundId, movieTmdbId, vote, hasReason: !!reasonText })
 
     if (!roundId || !movieTmdbId || !vote) {
+      console.error('[VOTE] Missing required fields:', { roundId: !!roundId, movieTmdbId: !!movieTmdbId, vote: !!vote })
       return NextResponse.json(
         { error: 'roundId, movieTmdbId, and vote are required' },
         { status: 400 }
@@ -43,13 +47,17 @@ export async function POST(request: NextRequest) {
     })
 
     if (!round) {
+      console.error('[VOTE] Round not found:', roundId)
       return NextResponse.json({ error: 'Round not found' }, { status: 404 })
     }
 
+    console.log('[VOTE] Round found, session status:', round.session.status)
+
     // Check if session is still active
     if (round.session.status !== 'active') {
+      console.error('[VOTE] Session is not active:', round.session.status)
       return NextResponse.json(
-        { error: 'Session is not active' },
+        { error: `Session is not active (status: ${round.session.status})` },
         { status: 400 }
       )
     }
@@ -57,17 +65,29 @@ export async function POST(request: NextRequest) {
     // Get current participant (member or guest)
     const participant = await getCurrentParticipant(round.session.group_id)
     if (!participant) {
+      console.error('[VOTE] Participant not found for group:', round.session.group_id)
       return NextResponse.json(
         { error: 'Not a participant in this group' },
         { status: 403 }
       )
     }
 
+    console.log('[VOTE] Participant found:', { id: participant.id, type: participant.type })
+
     // Verify movie is in this round
     const movieIds = round.movie_tmdb_ids as number[]
-    if (!movieIds.includes(movieTmdbId)) {
+    if (!movieIds || !Array.isArray(movieIds)) {
+      console.error('[VOTE] Invalid movieIds in round:', movieIds)
       return NextResponse.json(
-        { error: 'Movie not in this round' },
+        { error: 'Round has invalid movie list' },
+        { status: 500 }
+      )
+    }
+
+    if (!movieIds.includes(movieTmdbId)) {
+      console.error('[VOTE] Movie not in round:', { movieTmdbId, roundMovieIds: movieIds })
+      return NextResponse.json(
+        { error: `Movie ${movieTmdbId} not in this round` },
         { status: 400 }
       )
     }
@@ -91,6 +111,7 @@ export async function POST(request: NextRequest) {
           reason_text: reasonText || null,
         },
       })
+      console.log(`[VOTE] Updated vote for participant ${participant.id}, movie ${movieTmdbId}, vote: ${vote}`)
     } else {
       await prisma.vote.create({
         data: {
@@ -101,18 +122,55 @@ export async function POST(request: NextRequest) {
           reason_text: reasonText || null,
         },
       })
+      console.log(`[VOTE] Created vote for participant ${participant.id}, movie ${movieTmdbId}, vote: ${vote}`)
+    }
+
+    // Re-fetch active participants and votes to ensure we have fresh data
+    const freshRound = await prisma.votingRound.findUnique({
+      where: { id: roundId },
+      include: {
+        session: {
+          include: {
+            group: {
+              include: {
+                participants: {
+                  where: { status: 'active' },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!freshRound) {
+      return NextResponse.json({ error: 'Round not found after vote' }, { status: 404 })
     }
 
     // Check if round is complete (all active participants have voted on all 5 movies)
-    const activeParticipants = round.session.group.participants
+    const activeParticipants = freshRound.session.group.participants
     const roundVotes = await prisma.vote.findMany({
       where: { round_id: roundId },
     })
 
+    console.log(`[VOTE] Checking round completion: ${activeParticipants.length} active participants, ${roundVotes.length} total votes, ${movieIds.length} movies per round`)
+
+    // Debug: log each participant's vote status
+    activeParticipants.forEach((p) => {
+      const participantVotes = roundVotes.filter((v) => v.participant_id === p.id)
+      console.log(`[VOTE] Participant ${p.id} (${p.type}): ${participantVotes.length}/${movieIds.length} votes`)
+    })
+
     const roundComplete = activeParticipants.every((p) => {
       const participantVotes = roundVotes.filter((v) => v.participant_id === p.id)
-      return participantVotes.length === movieIds.length
+      const hasAllVotes = participantVotes.length === movieIds.length
+      if (!hasAllVotes) {
+        console.log(`[VOTE] Participant ${p.id} missing votes: has ${participantVotes.length}, needs ${movieIds.length}`)
+      }
+      return hasAllVotes
     })
+
+    console.log(`[VOTE] Round complete: ${roundComplete}`)
 
     if (!roundComplete) {
       // Round not complete yet, just return success
@@ -121,7 +179,7 @@ export async function POST(request: NextRequest) {
 
     // Re-fetch session to check if it was completed by another concurrent request (idempotency)
     const currentSession = await prisma.decisionSession.findUnique({
-      where: { id: round.session_id },
+      where: { id: freshRound.session_id },
       select: { status: true, final_movie_tmdb_id: true },
     })
 
@@ -147,7 +205,7 @@ export async function POST(request: NextRequest) {
 
         // Get all shown movie IDs to avoid recommending them
         const allRounds = await prisma.votingRound.findMany({
-          where: { session_id: round.session_id },
+          where: { session_id: freshRound.session_id },
         })
         const shownMovieIds = allRounds.flatMap(
           (r) => r.movie_tmdb_ids as number[]
@@ -158,7 +216,7 @@ export async function POST(request: NextRequest) {
 
         // Get AI recommendation based on solo user's votes
         const recommendation = await recommendMovieForSoloUser(
-          round.session.vibe_text,
+          freshRound.session.vibe_text,
           currentRoundVotes,
           shownMovieIds
         )
@@ -167,7 +225,7 @@ export async function POST(request: NextRequest) {
 
         // Update session with final movie
         await prisma.decisionSession.update({
-          where: { id: round.session_id },
+          where: { id: freshRound.session_id },
           data: {
             status: 'completed',
             final_movie_tmdb_id: recommendation.tmdb_id,
@@ -179,13 +237,13 @@ export async function POST(request: NextRequest) {
         await prisma.groupWatchlist.upsert({
           where: {
             group_id_tmdb_id: {
-              group_id: round.session.group_id,
+              group_id: freshRound.session.group_id,
               tmdb_id: recommendation.tmdb_id,
             },
           },
           update: {},
           create: {
-            group_id: round.session.group_id,
+            group_id: freshRound.session.group_id,
             tmdb_id: recommendation.tmdb_id,
           },
         })
@@ -236,7 +294,7 @@ export async function POST(request: NextRequest) {
       const finalMovieId = consensusMovies[0].movieId
 
       await prisma.decisionSession.update({
-        where: { id: round.session_id },
+        where: { id: freshRound.session_id },
         data: {
           status: 'completed',
           final_movie_tmdb_id: finalMovieId,
@@ -248,13 +306,13 @@ export async function POST(request: NextRequest) {
       await prisma.groupWatchlist.upsert({
         where: {
           group_id_tmdb_id: {
-            group_id: round.session.group_id,
+            group_id: freshRound.session.group_id,
             tmdb_id: finalMovieId,
           },
         },
         update: {},
         create: {
-          group_id: round.session.group_id,
+          group_id: freshRound.session.group_id,
           tmdb_id: finalMovieId,
         },
       })
@@ -268,11 +326,11 @@ export async function POST(request: NextRequest) {
     }
 
     // No consensus - check if we've reached max rounds
-    if (round.session.current_round >= 5) {
+    if (freshRound.session.current_round >= 5) {
       // Call Groq final resolution
       try {
         const allRounds = await prisma.votingRound.findMany({
-          where: { session_id: round.session_id },
+          where: { session_id: freshRound.session_id },
           include: { votes: true },
           orderBy: { round_number: 'asc' },
         })
@@ -292,20 +350,20 @@ export async function POST(request: NextRequest) {
 
         const watchlistTmdbIds = (
           await prisma.groupWatchlist.findMany({
-            where: { group_id: round.session.group_id },
+            where: { group_id: freshRound.session.group_id },
             select: { tmdb_id: true },
           })
         ).map((w) => w.tmdb_id)
 
         const recommendation = await recommendMovies(
-          round.session.vibe_text,
+          freshRound.session.vibe_text,
           allVotes,
           roundHistory,
           watchlistTmdbIds
         )
 
         await prisma.decisionSession.update({
-          where: { id: round.session_id },
+          where: { id: freshRound.session_id },
           data: {
             status: 'completed',
             final_movie_tmdb_id: recommendation.topPick.tmdb_id,
@@ -318,13 +376,13 @@ export async function POST(request: NextRequest) {
         await prisma.groupWatchlist.upsert({
           where: {
             group_id_tmdb_id: {
-              group_id: round.session.group_id,
+              group_id: freshRound.session.group_id,
               tmdb_id: recommendation.topPick.tmdb_id,
             },
           },
           update: {},
           create: {
-            group_id: round.session.group_id,
+            group_id: freshRound.session.group_id,
             tmdb_id: recommendation.topPick.tmdb_id,
           },
         })
@@ -351,7 +409,7 @@ export async function POST(request: NextRequest) {
     // Need to create next round
     try {
       const allRounds = await prisma.votingRound.findMany({
-        where: { session_id: round.session_id },
+        where: { session_id: freshRound.session_id },
         include: { votes: true },
         orderBy: { round_number: 'asc' },
       })
@@ -374,33 +432,35 @@ export async function POST(request: NextRequest) {
 
       const watchlistTmdbIds = (
         await prisma.groupWatchlist.findMany({
-          where: { group_id: round.session.group_id },
+          where: { group_id: freshRound.session.group_id },
           select: { tmdb_id: true },
         })
       ).map((w) => w.tmdb_id)
 
       const nextRoundMovies = await selectNextRoundMovies(
-        round.session.vibe_text,
+        freshRound.session.vibe_text,
         currentRoundVotes,
         roundHistory,
         watchlistTmdbIds
       )
 
-      const nextRoundNumber = round.session.current_round + 1
+      const nextRoundNumber = freshRound.session.current_round + 1
+      console.log(`[VOTE] Creating next round ${nextRoundNumber} with ${nextRoundMovies.length} movies`)
       await prisma.votingRound.create({
         data: {
-          session_id: round.session_id,
+          session_id: freshRound.session_id,
           round_number: nextRoundNumber,
           movie_tmdb_ids: nextRoundMovies,
         },
       })
 
       await prisma.decisionSession.update({
-        where: { id: round.session_id },
+        where: { id: freshRound.session_id },
         data: {
           current_round: nextRoundNumber,
         },
       })
+      console.log(`[VOTE] Next round ${nextRoundNumber} created and session updated`)
 
       return NextResponse.json({
         success: true,
@@ -419,9 +479,10 @@ export async function POST(request: NextRequest) {
       })
     }
   } catch (error) {
-    console.error('Error submitting vote:', error)
+    console.error('[VOTE] Error submitting vote:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Failed to submit vote' },
+      { error: `Failed to submit vote: ${errorMessage}` },
       { status: 500 }
     )
   }

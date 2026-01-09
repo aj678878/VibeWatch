@@ -73,6 +73,7 @@ export default async function VotingRoundPage({
   return (
     <VotingRoundClient
       sessionId={params.sessionId}
+      roundId={round.id}
       roundNumber={roundNumber}
       movieTmdbIds={round.movie_tmdb_ids as number[]}
       userVotes={round.votes.map((v) => ({
