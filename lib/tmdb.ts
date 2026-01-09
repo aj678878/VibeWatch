@@ -127,3 +127,79 @@ export function getBackdropUrl(backdropPath: string | null, size: 'w300' | 'w780
   if (!backdropPath) return null
   return `https://image.tmdb.org/t/p/${size}${backdropPath}`
 }
+
+/**
+ * Search TMDB with filters (genres, year range, etc.)
+ * Returns movies sorted by popularity (desc)
+ */
+export async function searchMoviesWithFilters(filters: {
+  genres?: string[]
+  year_min?: number
+  year_max?: number
+  query?: string
+  keywords?: string[]
+}): Promise<TMDBSearchResult> {
+  if (!TMDB_API_KEY) {
+    throw new Error('TMDB_API_KEY is not set')
+  }
+
+  const yearFrom = filters.year_min || 2001
+  const yearTo = filters.year_max || new Date().getFullYear()
+
+  // Build discover API URL with filters
+  const params = new URLSearchParams({
+    api_key: TMDB_API_KEY,
+    language: 'en-US',
+    sort_by: 'popularity.desc',
+    'primary_release_date.gte': `${yearFrom}-01-01`,
+    'primary_release_date.lte': `${yearTo}-12-31`,
+    page: '1',
+  })
+
+  // If we have a query, use search API first, then filter
+  if (filters.query && filters.query.trim()) {
+    const searchUrl = `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(filters.query)}&page=1&language=en-US`
+    const searchResponse = await fetch(searchUrl)
+    
+    if (!searchResponse.ok) {
+      throw new Error(`TMDB API error: ${searchResponse.statusText}`)
+    }
+    
+    const searchData = await searchResponse.json()
+    
+    // Filter results: Hindi/English only, year range, sort by popularity desc
+    const filtered = searchData.results
+      .filter((movie: any) => {
+        const lang = movie.original_language || ''
+        const year = movie.release_date ? parseInt(movie.release_date.split('-')[0]) : 0
+        return (lang === 'en' || lang === 'hi') && year >= yearFrom && year <= yearTo
+      })
+      .sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0))
+    
+    return {
+      ...searchData,
+      results: filtered,
+    }
+  }
+
+  // Use discover API for English and Hindi separately, then combine
+  const [enResponse, hiResponse] = await Promise.all([
+    fetch(`${TMDB_BASE_URL}/discover/movie?${params.toString()}&with_original_language=en`),
+    fetch(`${TMDB_BASE_URL}/discover/movie?${params.toString()}&with_original_language=hi`)
+  ])
+  
+  if (!enResponse.ok || !hiResponse.ok) {
+    throw new Error(`TMDB API error`)
+  }
+  
+  const [enData, hiData] = await Promise.all([enResponse.json(), hiResponse.json()])
+  
+  // Combine and sort by popularity
+  const combined = [...enData.results, ...hiData.results]
+    .sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0))
+  
+  return {
+    ...enData,
+    results: combined,
+  }
+}

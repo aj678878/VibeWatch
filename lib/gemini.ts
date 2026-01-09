@@ -6,6 +6,14 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
+export interface TMDBSearchFilters {
+  genres?: string[] // Genre names (e.g., "Action", "Comedy")
+  year_min?: number
+  year_max?: number
+  keywords?: string[] // Search keywords
+  query?: string // Main search query
+}
+
 if (!process.env.GEMINI_API_KEY) {
   console.warn('GEMINI_API_KEY not set - Gemini provider will not work')
 }
@@ -18,6 +26,86 @@ export interface MovieRecommendation {
   tmdb_id: number
   title: string
   reason: string
+}
+
+/**
+ * Convert vibe text to TMDB search filters using Gemini
+ */
+export async function getTMDBSearchFilters(vibeText: string): Promise<TMDBSearchFilters> {
+  if (!genAI) {
+    throw new Error('GEMINI_API_KEY environment variable is not set')
+  }
+
+  const prompt = `Convert the user's movie vibe/mood description into TMDB (The Movie Database) search filters.
+
+User's vibe: "${vibeText}"
+
+Return ONLY a JSON object with these fields:
+{
+  "genres": ["Action", "Comedy"],  // Array of genre names (use TMDB genre names)
+  "year_min": 2001,  // Minimum release year (must be >= 2001)
+  "year_max": 2025,  // Maximum release year (current year or later)
+  "keywords": ["keyword1", "keyword2"],  // Optional: relevant keywords for search
+  "query": "main search query"  // Main search query string for TMDB
+}
+
+IMPORTANT:
+- Only include Hindi (hi) or English (en) movies
+- year_min must be >= 2001
+- Use standard TMDB genre names (Action, Adventure, Animation, Comedy, Crime, Documentary, Drama, Family, Fantasy, History, Horror, Music, Mystery, Romance, Science Fiction, TV Movie, Thriller, War, Western)
+- If vibe is vague, use popular genres
+- Return valid JSON only, no extra text`
+
+  try {
+    console.log('=== GEMINI: Getting TMDB Search Filters ===')
+    console.log('Vibe text:', vibeText)
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
+    console.log('Using Gemini model: gemini-3-flash-preview')
+
+    const result = await model.generateContent(prompt)
+    const response = await result.response
+    const content = response.text()
+
+    console.log('Gemini raw response:', content)
+
+    if (!content) {
+      throw new Error('No response content from Gemini API')
+    }
+
+    // Extract JSON from response
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('No JSON found in Gemini response')
+    }
+
+    const filters = JSON.parse(jsonMatch[0]) as TMDBSearchFilters
+
+    // Validate and set defaults
+    if (!filters.year_min || filters.year_min < 2001) {
+      filters.year_min = 2001
+    }
+    if (!filters.year_max) {
+      filters.year_max = new Date().getFullYear()
+    }
+    if (!filters.query && !filters.genres && !filters.keywords) {
+      // Fallback: use vibe text as query
+      filters.query = vibeText
+    }
+
+    console.log('Parsed TMDB filters:', JSON.stringify(filters, null, 2))
+    console.log('=== END GEMINI: TMDB Search Filters ===\n')
+
+    return filters
+  } catch (error) {
+    console.error('Error getting TMDB search filters from Gemini:', error)
+    // Fallback: return basic filters with vibe as query
+    return {
+      query: vibeText,
+      year_min: 2001,
+      year_max: new Date().getFullYear(),
+    }
+  }
 }
 
 /**
@@ -49,7 +137,7 @@ CRITICAL RESTRICTIONS:
 - Only recommend Hindi (language code: hi) or English (language code: en) movies
 - Only recommend movies released AFTER 2000 (year >= 2001)
 - The recommended movie MUST NOT be one of these already shown: ${shownMovieIds.join(', ')}
-- You must provide a valid TMDB movie ID for a real movie that exists
+- Return the movie TITLE (name), NOT a TMDB ID. The system will search TMDB for this title.
 
 User's mood/vibe: "${vibeText}"
 
@@ -71,12 +159,11 @@ Based on this information, recommend ONE movie that:
 
 Return ONLY a JSON object:
 {
-  "tmdb_id": 123,
   "title": "Movie Title",
   "reason": "Brief explanation of why this movie fits their preferences"
 }
 
-The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restrictions above.`
+IMPORTANT: Return ONLY the movie TITLE (name), NOT a TMDB ID. The system will search TMDB for this movie title.`
 
   try {
     console.log('=== GEMINI SOLO RECOMMENDATION DEBUG ===')
@@ -111,10 +198,9 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restri
       throw new Error('No JSON found in Gemini response')
     }
 
-    let resultData: { tmdb_id: number; title: string; reason: string }
+    let resultData: { title: string; reason: string }
     try {
       resultData = JSON.parse(jsonMatch[0]) as {
-        tmdb_id: number
         title: string
         reason: string
       }
@@ -126,18 +212,52 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restri
     }
 
     // Validate required fields
-    if (!resultData.tmdb_id || typeof resultData.tmdb_id !== 'number') {
-      throw new Error('Gemini response missing valid tmdb_id field')
-    }
-
     if (!resultData.title || typeof resultData.title !== 'string') {
       throw new Error('Gemini response missing valid title field')
     }
-
-    console.log('Parsed recommendation:', JSON.stringify(resultData, null, 2))
+    
+    console.log('Parsed recommendation (movie name):', JSON.stringify(resultData, null, 2))
+    
+    // Step: Search TMDB for this movie title
+    console.log('Searching TMDB for movie:', resultData.title)
+    const { searchMovies } = await import('@/lib/tmdb')
+    const tmdbSearch = await searchMovies(resultData.title, 1)
+    
+    // Find the best match (exact title match preferred, then first result)
+    let tmdbId: number | null = null
+    const exactMatch = tmdbSearch.results.find(
+      (m) => m.title.toLowerCase() === resultData.title.toLowerCase()
+    )
+    
+    if (exactMatch) {
+      tmdbId = exactMatch.id
+      console.log('Found exact match in TMDB:', exactMatch.id, exactMatch.title)
+    } else if (tmdbSearch.results.length > 0) {
+      // Filter for Hindi/English, after 2000
+      const filtered = tmdbSearch.results.filter((m) => {
+        const lang = m.original_language || ''
+        const year = m.release_date ? parseInt(m.release_date.split('-')[0]) : 0
+        return (lang === 'en' || lang === 'hi') && year >= 2001
+      })
+      
+      if (filtered.length > 0) {
+        tmdbId = filtered[0].id
+        console.log('Found match in TMDB:', filtered[0].id, filtered[0].title)
+      }
+    }
+    
+    if (!tmdbId) {
+      throw new Error(`Could not find movie "${resultData.title}" in TMDB`)
+    }
+    
+    console.log('Final recommendation:', { tmdb_id: tmdbId, title: resultData.title, reason: resultData.reason })
     console.log('=== END GEMINI SOLO RECOMMENDATION DEBUG ===\n')
 
-    return resultData
+    return {
+      tmdb_id: tmdbId,
+      title: resultData.title,
+      reason: resultData.reason,
+    }
   } catch (error) {
     console.error('Error getting solo recommendation from Gemini:', error)
     if (error instanceof Error) {
@@ -197,21 +317,20 @@ ${noVotes.some((v) => v.reason_text) ? `- NO vote reasons: ${noVotes.filter((v) 
 Movies already shown in rounds: ${Array.from(shownMovies).join(', ')}
 Available watchlist movies: ${watchlistTmdbIds.join(', ')}
 
-Recommend 1 top pick and 2 alternates. You can recommend:
-- Movies from the watchlist (preferred)
-- Movies NOT in the watchlist if they better match preferences (but provide TMDB IDs)
+Recommend 1 top pick and 2 alternates.
 
 For each recommendation, provide:
-- tmdb_id (must be a valid TMDB movie ID)
-- title (movie title)
+- title (movie title - the system will search TMDB for this)
 - reason (brief explanation why this fits)
+
+IMPORTANT: Return ONLY movie TITLES (names), NOT TMDB IDs. The system will search TMDB for these titles.
 
 Return ONLY a JSON object:
 {
-  "topPick": {"tmdb_id": 123, "title": "Movie Title", "reason": "..."},
+  "topPick": {"title": "Movie Title", "reason": "..."},
   "alternates": [
-    {"tmdb_id": 456, "title": "Movie 2", "reason": "..."},
-    {"tmdb_id": 789, "title": "Movie 3", "reason": "..."}
+    {"title": "Movie 2", "reason": "..."},
+    {"title": "Movie 3", "reason": "..."}
   ],
   "explanation": "Overall explanation of why these recommendations are fair and match the group's preferences"
 }
@@ -248,14 +367,14 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
     }
 
     let resultData: {
-      topPick: MovieRecommendation
-      alternates: MovieRecommendation[]
+      topPick: { title: string; reason: string }
+      alternates: Array<{ title: string; reason: string }>
       explanation: string
     }
     try {
       resultData = JSON.parse(jsonMatch[0]) as {
-        topPick: MovieRecommendation
-        alternates: MovieRecommendation[]
+        topPick: { title: string; reason: string }
+        alternates: Array<{ title: string; reason: string }>
         explanation: string
       }
     } catch (parseError) {
@@ -266,22 +385,80 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
     }
 
     // Validate required fields
-    if (!resultData.topPick || !resultData.topPick.tmdb_id || typeof resultData.topPick.tmdb_id !== 'number') {
-      throw new Error('Gemini response missing valid topPick.tmdb_id field')
-    }
-
-    if (!resultData.topPick.title || typeof resultData.topPick.title !== 'string') {
+    if (!resultData.topPick || !resultData.topPick.title || typeof resultData.topPick.title !== 'string') {
       throw new Error('Gemini response missing valid topPick.title field')
     }
 
     if (!Array.isArray(resultData.alternates)) {
       throw new Error('Gemini response missing valid alternates array')
     }
-
-    console.log('Parsed recommendation:', JSON.stringify(resultData, null, 2))
+    
+    console.log('Parsed recommendation (movie names):', JSON.stringify(resultData, null, 2))
+    
+    // Search TMDB for each movie title
+    const { searchMovies } = await import('@/lib/tmdb')
+    
+    const searchAndGetId = async (title: string): Promise<number> => {
+      console.log(`Searching TMDB for: ${title}`)
+      const tmdbSearch = await searchMovies(title, 1)
+      
+      // Find exact match first
+      const exactMatch = tmdbSearch.results.find(
+        (m) => m.title.toLowerCase() === title.toLowerCase()
+      )
+      
+      if (exactMatch) {
+        const lang = exactMatch.original_language || ''
+        const year = exactMatch.release_date ? parseInt(exactMatch.release_date.split('-')[0]) : 0
+        if ((lang === 'en' || lang === 'hi') && year >= 2001) {
+          console.log(`Found exact match: ${exactMatch.id} - ${exactMatch.title}`)
+          return exactMatch.id
+        }
+      }
+      
+      // Filter for Hindi/English, after 2000
+      const filtered = tmdbSearch.results.filter((m) => {
+        const lang = m.original_language || ''
+        const year = m.release_date ? parseInt(m.release_date.split('-')[0]) : 0
+        return (lang === 'en' || lang === 'hi') && year >= 2001
+      })
+      
+      if (filtered.length > 0) {
+        console.log(`Found match: ${filtered[0].id} - ${filtered[0].title}`)
+        return filtered[0].id
+      }
+      
+      throw new Error(`Could not find movie "${title}" in TMDB`)
+    }
+    
+    // Get TMDB IDs for all recommendations
+    const [topPickId, ...alternateIds] = await Promise.all([
+      searchAndGetId(resultData.topPick.title),
+      ...resultData.alternates.map(a => searchAndGetId(a.title))
+    ])
+    
+    const finalResult: {
+      topPick: MovieRecommendation
+      alternates: MovieRecommendation[]
+      explanation: string
+    } = {
+      topPick: {
+        tmdb_id: topPickId,
+        title: resultData.topPick.title,
+        reason: resultData.topPick.reason,
+      },
+      alternates: resultData.alternates.map((alt, idx) => ({
+        tmdb_id: alternateIds[idx],
+        title: alt.title,
+        reason: alt.reason,
+      })),
+      explanation: resultData.explanation,
+    }
+    
+    console.log('Final recommendation with TMDB IDs:', JSON.stringify(finalResult, null, 2))
     console.log('=== END GEMINI FINAL RESOLUTION DEBUG ===\n')
 
-    return resultData
+    return finalResult
   } catch (error) {
     console.error('Error getting recommendations from Gemini:', error)
     if (error instanceof Error) {

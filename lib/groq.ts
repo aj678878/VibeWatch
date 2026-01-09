@@ -139,7 +139,7 @@ CRITICAL RESTRICTIONS:
 - Only recommend Hindi (language code: hi) or English (language code: en) movies
 - Only recommend movies released AFTER 2000 (year >= 2001)
 - The recommended movie MUST NOT be one of these already shown: ${shownMovieIds.join(', ')}
-- You must provide a valid TMDB movie ID for a real movie that exists
+- Return the movie TITLE (name), NOT a TMDB ID. The system will search TMDB for this title.
 
 User's mood/vibe: "${vibeText}"
 
@@ -161,12 +161,11 @@ Based on this information, recommend ONE movie that:
 
 Return ONLY a JSON object:
 {
-  "tmdb_id": 123,
   "title": "Movie Title",
   "reason": "Brief explanation of why this movie fits their preferences"
 }
 
-The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restrictions above.`
+IMPORTANT: Return ONLY the movie TITLE (name), NOT a TMDB ID. The system will search TMDB for this movie title.`
 
   try {
     if (!process.env.GROQ_API_KEY) {
@@ -225,10 +224,9 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restri
       throw new Error('No response content from Groq API')
     }
 
-    let result: { tmdb_id: number; title: string; reason: string }
+    let result: { title: string; reason: string }
     try {
       result = JSON.parse(content) as {
-        tmdb_id: number
         title: string
         reason: string
       }
@@ -239,20 +237,53 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restri
     }
 
     // Validate required fields
-    if (!result.tmdb_id || typeof result.tmdb_id !== 'number') {
-      console.error('Invalid Groq response - missing or invalid tmdb_id:', result)
-      throw new Error('Groq response missing valid tmdb_id field')
-    }
-
     if (!result.title || typeof result.title !== 'string') {
       console.error('Invalid Groq response - missing or invalid title:', result)
       throw new Error('Groq response missing valid title field')
     }
     
-    console.log('Parsed recommendation:', JSON.stringify(result, null, 2))
+    console.log('Parsed recommendation (movie name):', JSON.stringify(result, null, 2))
+    
+    // Step: Search TMDB for this movie title
+    console.log('Searching TMDB for movie:', result.title)
+    const { searchMovies } = await import('@/lib/tmdb')
+    const tmdbSearch = await searchMovies(result.title, 1)
+    
+    // Find the best match (exact title match preferred, then first result)
+    let tmdbId: number | null = null
+    const exactMatch = tmdbSearch.results.find(
+      (m) => m.title.toLowerCase() === result.title.toLowerCase()
+    )
+    
+    if (exactMatch) {
+      tmdbId = exactMatch.id
+      console.log('Found exact match in TMDB:', exactMatch.id, exactMatch.title)
+    } else if (tmdbSearch.results.length > 0) {
+      // Filter for Hindi/English, after 2000
+      const filtered = tmdbSearch.results.filter((m) => {
+        const lang = m.original_language || ''
+        const year = m.release_date ? parseInt(m.release_date.split('-')[0]) : 0
+        return (lang === 'en' || lang === 'hi') && year >= 2001
+      })
+      
+      if (filtered.length > 0) {
+        tmdbId = filtered[0].id
+        console.log('Found match in TMDB:', filtered[0].id, filtered[0].title)
+      }
+    }
+    
+    if (!tmdbId) {
+      throw new Error(`Could not find movie "${result.title}" in TMDB`)
+    }
+    
+    console.log('Final recommendation:', { tmdb_id: tmdbId, title: result.title, reason: result.reason })
     console.log('=== END GROQ SOLO RECOMMENDATION DEBUG ===\n')
 
-    return result
+    return {
+      tmdb_id: tmdbId,
+      title: result.title,
+      reason: result.reason,
+    }
   } catch (error) {
     console.error('Error getting solo recommendation:', error)
     if (error instanceof Error) {
@@ -305,21 +336,20 @@ ${noVotes.some((v) => v.reason_text) ? `- NO vote reasons: ${noVotes.filter((v) 
 Movies already shown in rounds: ${Array.from(shownMovies).join(', ')}
 Available watchlist movies: ${watchlistTmdbIds.join(', ')}
 
-Recommend 1 top pick and 2 alternates. You can recommend:
-- Movies from the watchlist (preferred)
-- Movies NOT in the watchlist if they better match preferences (but provide TMDB IDs)
+Recommend 1 top pick and 2 alternates.
 
 For each recommendation, provide:
-- tmdb_id (must be a valid TMDB movie ID)
-- title (movie title)
+- title (movie title - the system will search TMDB for this)
 - reason (brief explanation why this fits)
+
+IMPORTANT: Return ONLY movie TITLES (names), NOT TMDB IDs. The system will search TMDB for these titles.
 
 Return ONLY a JSON object:
 {
-  "topPick": {"tmdb_id": 123, "title": "Movie Title", "reason": "..."},
+  "topPick": {"title": "Movie Title", "reason": "..."},
   "alternates": [
-    {"tmdb_id": 456, "title": "Movie 2", "reason": "..."},
-    {"tmdb_id": 789, "title": "Movie 3", "reason": "..."}
+    {"title": "Movie 2", "reason": "..."},
+    {"title": "Movie 3", "reason": "..."}
   ],
   "explanation": "Overall explanation of why these recommendations are fair and match the group's preferences"
 }
@@ -343,7 +373,7 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
           {
             role: 'system',
             content:
-              'You are a fair movie recommendation assistant. Recommend movies that minimize objections while respecting group preferences. IMPORTANT: Only recommend Hindi or English movies released after 2000. Return only valid JSON with tmdb_id, title, reason, and explanation fields.',
+              'You are a fair movie recommendation assistant. Recommend movies that minimize objections while respecting group preferences. IMPORTANT: Only recommend Hindi or English movies released after 2000. Return only valid JSON with title, reason, and explanation fields. Return movie TITLES, not TMDB IDs.',
           },
           {
             role: 'user',
@@ -376,11 +406,15 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
       throw new Error('No response content from Groq API')
     }
 
-    let result: { topPick: MovieRecommendation; alternates: MovieRecommendation[]; explanation: string }
+    let resultData: {
+      topPick: { title: string; reason: string }
+      alternates: Array<{ title: string; reason: string }>
+      explanation: string
+    }
     try {
-      result = JSON.parse(content) as {
-        topPick: MovieRecommendation
-        alternates: MovieRecommendation[]
+      resultData = JSON.parse(content) as {
+        topPick: { title: string; reason: string }
+        alternates: Array<{ title: string; reason: string }>
         explanation: string
       }
     } catch (parseError) {
@@ -390,25 +424,80 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
     }
 
     // Validate required fields
-    if (!result.topPick || !result.topPick.tmdb_id || typeof result.topPick.tmdb_id !== 'number') {
-      console.error('Invalid Groq response - missing or invalid topPick.tmdb_id:', result)
-      throw new Error('Groq response missing valid topPick.tmdb_id field')
-    }
-
-    if (!result.topPick.title || typeof result.topPick.title !== 'string') {
-      console.error('Invalid Groq response - missing or invalid topPick.title:', result)
+    if (!resultData.topPick || !resultData.topPick.title || typeof resultData.topPick.title !== 'string') {
       throw new Error('Groq response missing valid topPick.title field')
     }
 
-    if (!Array.isArray(result.alternates)) {
-      console.error('Invalid Groq response - alternates is not an array:', result)
+    if (!Array.isArray(resultData.alternates)) {
       throw new Error('Groq response missing valid alternates array')
     }
     
-    console.log('Parsed recommendation:', JSON.stringify(result, null, 2))
+    console.log('Parsed recommendation (movie names):', JSON.stringify(resultData, null, 2))
+    
+    // Search TMDB for each movie title
+    const { searchMovies } = await import('@/lib/tmdb')
+    
+    const searchAndGetId = async (title: string): Promise<number> => {
+      console.log(`Searching TMDB for: ${title}`)
+      const tmdbSearch = await searchMovies(title, 1)
+      
+      // Find exact match first
+      const exactMatch = tmdbSearch.results.find(
+        (m) => m.title.toLowerCase() === title.toLowerCase()
+      )
+      
+      if (exactMatch) {
+        const lang = exactMatch.original_language || ''
+        const year = exactMatch.release_date ? parseInt(exactMatch.release_date.split('-')[0]) : 0
+        if ((lang === 'en' || lang === 'hi') && year >= 2001) {
+          console.log(`Found exact match: ${exactMatch.id} - ${exactMatch.title}`)
+          return exactMatch.id
+        }
+      }
+      
+      // Filter for Hindi/English, after 2000
+      const filtered = tmdbSearch.results.filter((m) => {
+        const lang = m.original_language || ''
+        const year = m.release_date ? parseInt(m.release_date.split('-')[0]) : 0
+        return (lang === 'en' || lang === 'hi') && year >= 2001
+      })
+      
+      if (filtered.length > 0) {
+        console.log(`Found match: ${filtered[0].id} - ${filtered[0].title}`)
+        return filtered[0].id
+      }
+      
+      throw new Error(`Could not find movie "${title}" in TMDB`)
+    }
+    
+    // Get TMDB IDs for all recommendations
+    const [topPickId, ...alternateIds] = await Promise.all([
+      searchAndGetId(resultData.topPick.title),
+      ...resultData.alternates.map(a => searchAndGetId(a.title))
+    ])
+    
+    const finalResult: {
+      topPick: MovieRecommendation
+      alternates: MovieRecommendation[]
+      explanation: string
+    } = {
+      topPick: {
+        tmdb_id: topPickId,
+        title: resultData.topPick.title,
+        reason: resultData.topPick.reason,
+      },
+      alternates: resultData.alternates.map((alt, idx) => ({
+        tmdb_id: alternateIds[idx],
+        title: alt.title,
+        reason: alt.reason,
+      })),
+      explanation: resultData.explanation,
+    }
+    
+    console.log('Final recommendation with TMDB IDs:', JSON.stringify(finalResult, null, 2))
     console.log('=== END GROQ FINAL RESOLUTION DEBUG ===\n')
 
-    return result
+    return finalResult
   } catch (error) {
     console.error('Error getting recommendations:', error)
     if (error instanceof Error) {

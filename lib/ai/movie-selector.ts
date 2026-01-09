@@ -1,5 +1,6 @@
-import { searchMovies, getMovieDetails, type TMDBMovie } from '@/lib/tmdb'
+import { searchMovies, searchMoviesWithFilters, getMovieDetails, type TMDBMovie } from '@/lib/tmdb'
 import { extractPreferences, type PreferenceConstraints } from '@/lib/groq'
+import { getTMDBSearchFilters } from '@/lib/gemini'
 
 /**
  * Select initial round movies based on vibe text.
@@ -10,14 +11,23 @@ export async function selectInitialRoundMovies(vibeText: string): Promise<number
   try {
     console.log('=== MOVIE SELECTION DEBUG ===')
     console.log('Vibe text:', vibeText)
+    
+    // Step 1: Pass vibe to Gemini to get exact search filters
+    console.log('Step 1: Getting TMDB search filters from Gemini...')
+    const filters = await getTMDBSearchFilters(vibeText)
+    
+    console.log('Gemini returned filters:', JSON.stringify(filters, null, 2))
     console.log('Search parameters:')
+    console.log('  - Query:', filters.query || 'N/A')
+    console.log('  - Genres:', filters.genres?.join(', ') || 'N/A')
+    console.log('  - Year range:', `${filters.year_min || 2001}-${filters.year_max || new Date().getFullYear()}`)
     console.log('  - Languages: Hindi (hi) or English (en)')
-    console.log('  - Year: 2000 onwards')
     console.log('  - Sort: Popularity (desc)')
     console.log('  - Limit: Top 5')
     
-    // Search TMDB with vibe text as query
-    const searchResults = await searchMovies(vibeText, 1)
+    // Step 2: Search TMDB based on filters
+    console.log('Step 2: Searching TMDB with filters...')
+    const searchResults = await searchMoviesWithFilters(filters)
     
     console.log('TMDB Search Results:')
     console.log('  - Total results:', searchResults.total_results)
@@ -27,7 +37,7 @@ export async function selectInitialRoundMovies(vibeText: string): Promise<number
       console.log(`    ${idx + 1}. [${movie.id}] ${movie.title} (${movie.release_date?.split('-')[0] || 'N/A'}) - Lang: ${movie.original_language}, Popularity: ${movie.popularity?.toFixed(2) || 'N/A'}`)
     })
     
-    // Get first 5 movie IDs from search results (already sorted by popularity)
+    // Step 3: Get first 5 movie IDs (already sorted by popularity)
     const movieIds = searchResults.results
       .slice(0, 5)
       .map((movie) => movie.id)
