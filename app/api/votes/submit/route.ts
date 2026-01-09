@@ -256,10 +256,17 @@ export async function POST(request: NextRequest) {
           soloMode: true,
         })
       } catch (error) {
-        console.error('Error in solo mode Groq recommendation:', error)
-        // Don't fallback to first movie - throw error instead
+        console.error('[VOTE] Error in solo mode Groq recommendation:', error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        const errorStack = error instanceof Error ? error.stack : undefined
+        console.error('[VOTE] Error details:', { errorMessage, errorStack })
+        
+        // Return detailed error for debugging
         return NextResponse.json(
-          { error: 'Failed to generate recommendation. Please try again.' },
+          { 
+            error: 'Failed to generate recommendation. Please try again.',
+            details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+          },
           { status: 500 }
         )
       }
@@ -395,14 +402,20 @@ export async function POST(request: NextRequest) {
           finalMovieTmdbId: recommendation.topPick.tmdb_id,
         })
       } catch (error) {
-        console.error('Error in Groq final resolution:', error)
+        console.error('[VOTE] Error in Groq final resolution:', error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        const errorStack = error instanceof Error ? error.stack : undefined
+        console.error('[VOTE] Error details:', { errorMessage, errorStack })
+        
+        // Return error but don't mark as success
         return NextResponse.json({
-          success: true,
+          success: false,
           roundComplete: true,
           consensus: false,
           maxRoundsReached: true,
           error: 'Failed to generate final resolution',
-        })
+          details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+        }, { status: 500 })
       }
     }
 

@@ -1,7 +1,11 @@
 import Groq from 'groq-sdk'
 
+if (!process.env.GROQ_API_KEY) {
+  console.error('WARNING: GROQ_API_KEY environment variable is not set!')
+}
+
 const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
+  apiKey: process.env.GROQ_API_KEY || '',
 })
 
 export interface PreferenceConstraints {
@@ -165,6 +169,10 @@ Return ONLY a JSON object:
 The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restrictions above.`
 
   try {
+    if (!process.env.GROQ_API_KEY) {
+      throw new Error('GROQ_API_KEY environment variable is not set')
+    }
+
     console.log('=== GROQ SOLO RECOMMENDATION DEBUG ===')
     console.log('Input prompt:', prompt)
     console.log('Votes summary:')
@@ -192,13 +200,32 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restri
     console.log('Groq raw response:', content)
     
     if (!content) {
-      throw new Error('No response from Groq')
+      console.error('Groq returned empty content. Full response:', JSON.stringify(completion, null, 2))
+      throw new Error('No response content from Groq API')
     }
 
-    const result = JSON.parse(content) as {
-      tmdb_id: number
-      title: string
-      reason: string
+    let result: { tmdb_id: number; title: string; reason: string }
+    try {
+      result = JSON.parse(content) as {
+        tmdb_id: number
+        title: string
+        reason: string
+      }
+    } catch (parseError) {
+      console.error('Failed to parse Groq JSON response:', content)
+      console.error('Parse error:', parseError)
+      throw new Error(`Invalid JSON response from Groq: ${parseError instanceof Error ? parseError.message : String(parseError)}`)
+    }
+
+    // Validate required fields
+    if (!result.tmdb_id || typeof result.tmdb_id !== 'number') {
+      console.error('Invalid Groq response - missing or invalid tmdb_id:', result)
+      throw new Error('Groq response missing valid tmdb_id field')
+    }
+
+    if (!result.title || typeof result.title !== 'string') {
+      console.error('Invalid Groq response - missing or invalid title:', result)
+      throw new Error('Groq response missing valid title field')
     }
     
     console.log('Parsed recommendation:', JSON.stringify(result, null, 2))
@@ -207,6 +234,11 @@ The tmdb_id MUST be a valid TMDB movie ID for a real movie that meets all restri
     return result
   } catch (error) {
     console.error('Error getting solo recommendation:', error)
+    if (error instanceof Error) {
+      console.error('Error name:', error.name)
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+    }
     throw error
   }
 }
@@ -274,6 +306,10 @@ Return ONLY a JSON object:
 Be fair, consider all preferences, and avoid movies that were strongly rejected. All movies must be Hindi or English, released after 2000.`
 
   try {
+    if (!process.env.GROQ_API_KEY) {
+      throw new Error('GROQ_API_KEY environment variable is not set')
+    }
+
     console.log('=== GROQ FINAL RESOLUTION DEBUG ===')
     console.log('Input prompt:', prompt)
     
@@ -298,13 +334,37 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
     console.log('Groq raw response:', content)
     
     if (!content) {
-      throw new Error('No response from Groq')
+      console.error('Groq returned empty content. Full response:', JSON.stringify(completion, null, 2))
+      throw new Error('No response content from Groq API')
     }
 
-    const result = JSON.parse(content) as {
-      topPick: MovieRecommendation
-      alternates: MovieRecommendation[]
-      explanation: string
+    let result: { topPick: MovieRecommendation; alternates: MovieRecommendation[]; explanation: string }
+    try {
+      result = JSON.parse(content) as {
+        topPick: MovieRecommendation
+        alternates: MovieRecommendation[]
+        explanation: string
+      }
+    } catch (parseError) {
+      console.error('Failed to parse Groq JSON response:', content)
+      console.error('Parse error:', parseError)
+      throw new Error(`Invalid JSON response from Groq: ${parseError instanceof Error ? parseError.message : String(parseError)}`)
+    }
+
+    // Validate required fields
+    if (!result.topPick || !result.topPick.tmdb_id || typeof result.topPick.tmdb_id !== 'number') {
+      console.error('Invalid Groq response - missing or invalid topPick.tmdb_id:', result)
+      throw new Error('Groq response missing valid topPick.tmdb_id field')
+    }
+
+    if (!result.topPick.title || typeof result.topPick.title !== 'string') {
+      console.error('Invalid Groq response - missing or invalid topPick.title:', result)
+      throw new Error('Groq response missing valid topPick.title field')
+    }
+
+    if (!Array.isArray(result.alternates)) {
+      console.error('Invalid Groq response - alternates is not an array:', result)
+      throw new Error('Groq response missing valid alternates array')
     }
     
     console.log('Parsed recommendation:', JSON.stringify(result, null, 2))
@@ -313,6 +373,11 @@ Be fair, consider all preferences, and avoid movies that were strongly rejected.
     return result
   } catch (error) {
     console.error('Error getting recommendations:', error)
+    if (error instanceof Error) {
+      console.error('Error name:', error.name)
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+    }
     throw error
   }
 }
